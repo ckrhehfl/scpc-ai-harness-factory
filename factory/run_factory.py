@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from factory.spec_builder import build_contest_spec, save_contest_spec
 from factory.gap_analyzer import analyze_gaps, save_gap_report
+from factory.blueprint_generator import build_harness_blueprint, save_harness_blueprint
 from factory.harness_generator import generate_harness
 from factory.experiment_manager import save_run_log
 from factory.report_writer import write_solution_log_stub
@@ -32,8 +33,16 @@ def main() -> int:
     gap_report = analyze_gaps(spec)
     gap_path = save_gap_report(gap_report, output_dir)
 
+    blueprint = build_harness_blueprint(
+        spec,
+        gap_report,
+        templates_dir=PROJECT_ROOT / "templates",
+    )
+    blueprint_yaml, blueprint_md = save_harness_blueprint(blueprint, output_dir)
+
     harness_dir = generate_harness(
         spec,
+        blueprint=blueprint,
         template_dir=PROJECT_ROOT / "templates" / "base_harness",
         output_dir=output_dir / "final_harness",
     )
@@ -45,6 +54,8 @@ def main() -> int:
     print(f"- Contest spec: {spec_yaml}")
     print(f"- Contest spec JSON: {spec_json}")
     print(f"- Gap report: {gap_path}")
+    print(f"- Harness blueprint YAML: {blueprint_yaml}")
+    print(f"- Harness blueprint MD: {blueprint_md}")
     print(f"- Solution log: {solution_log}")
     print(f"- Final harness: {harness_dir}")
     print(f"- Run log: {run_dir}")

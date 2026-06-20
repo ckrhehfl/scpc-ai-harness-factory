@@ -8,6 +8,7 @@
 contest folder
 → contest_spec.yaml
 → gap_report.md
+→ harness_blueprint.yaml / harness_blueprint.md
 → generated/final_harness/
 → submission.csv
 ```
@@ -19,6 +20,7 @@ contest folder
 - mock contest 기반 end-to-end 실행
 - ContestSpec 생성
 - Gap Report 생성
+- Harness Blueprint 생성
 - base harness scaffold 생성
 - submission.csv 생성
 - 간단한 pytest 테스트
@@ -104,11 +106,17 @@ pytest
 v0.2 ContestSpec 스키마 분석 검증은 두 mock contest를 모두 실행한 뒤 `generated/contest_spec.yaml`과
 `generated/gap_report.md`에서 컬럼 상세, train/test/sample_submission 컬럼 차이, 제출 형식 추론 근거를 확인합니다.
 
+v0.3 Harness Blueprint 단계는 `ContestSpec`과 `GapReport`를 기반으로 `generated/harness_blueprint.yaml` 및
+`generated/harness_blueprint.md`를 생성한 뒤 final harness 생성을 진행합니다. Blueprint에는 task type, 추천 템플릿,
+loader/solver/verifier/submitter 요구사항, 사람 확인 필요 항목, 알려진 위험이 포함됩니다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text
 generated/contest_spec.yaml
 generated/gap_report.md
+generated/harness_blueprint.yaml
+generated/harness_blueprint.md
 generated/final_harness/
 generated/final_harness/outputs/submission.csv
 runs/run_001/run_log.json

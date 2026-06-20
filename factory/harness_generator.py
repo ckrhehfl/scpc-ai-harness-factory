@@ -8,6 +8,7 @@ from factory.utils import write_json
 
 def generate_harness(
     spec: dict[str, Any],
+    blueprint: dict[str, Any] | None = None,
     template_dir: str | Path = "templates/base_harness",
     output_dir: str | Path = "generated/final_harness",
 ) -> Path:
@@ -29,9 +30,16 @@ def generate_harness(
         "rules": spec["rules"],
         "solver": {
             "name": "baseline_constant_solver",
-            "default_answer": spec["output"].get("default_value", "1"),
+            "default_answer": (blueprint or {}).get("default_value", spec["output"].get("default_value", "1")),
         },
     }
+    if blueprint is not None:
+        config["harness_blueprint"] = {
+            "recommended_template": blueprint.get("recommended_template", "base_harness"),
+            "verifier_requirements": blueprint.get("verifier_requirements", []),
+            "human_decisions_required": blueprint.get("human_decisions_required", []),
+            "known_risks": blueprint.get("known_risks", []),
+        }
     write_json(out / "configs" / "default.json", config)
     write_json(out / "contest_spec.json", spec)
     return out

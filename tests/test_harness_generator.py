@@ -3,17 +3,21 @@ import csv
 import subprocess
 import sys
 
+from factory.blueprint_generator import build_harness_blueprint
+from factory.gap_analyzer import analyze_gaps
 from factory.spec_builder import build_contest_spec
 from factory.harness_generator import generate_harness
 
 
 def test_generate_harness(tmp_path):
     spec = build_contest_spec("examples/mock_contest_01")
+    blueprint = build_harness_blueprint(spec, analyze_gaps(spec), templates_dir=tmp_path)
     out = tmp_path / "final_harness"
-    generate_harness(spec, output_dir=out)
+    generate_harness(spec, blueprint=blueprint, output_dir=out)
     assert (out / "run.py").exists()
     assert (out / "configs" / "default.json").exists()
     assert (out / "src" / "solver.py").exists()
+    assert "harness_blueprint" in (out / "configs" / "default.json").read_text(encoding="utf-8")
 
 
 def test_generated_harness_runs_for_text_classification(tmp_path):
