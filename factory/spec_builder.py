@@ -35,12 +35,21 @@ def infer_id_target_columns(sample_columns: list[str]) -> tuple[str, str]:
     return id_col, target_col
 
 
+def infer_default_output_value(sample_submission: dict[str, Any], target_col: str) -> str:
+    first_row = sample_submission.get("first_row") or {}
+    value = first_row.get(target_col)
+    if value not in {None, ""}:
+        return str(value)
+    return "1"
+
+
 def build_contest_spec(contest_path: str | Path) -> dict[str, Any]:
     raw = read_contest_folder(contest_path)
     files = raw["files"]
     task_type, modalities, output_type = infer_task_type(files)
     sample_columns = files["sample_submission"]["columns"]
     id_col, target_col = infer_id_target_columns(sample_columns)
+    default_output_value = infer_default_output_value(files["sample_submission"], target_col)
 
     rules_text = (raw.get("rules") or "").lower()
     allowed_language = "Python" if "python" in rules_text or not rules_text else "unknown"
@@ -72,6 +81,7 @@ def build_contest_spec(contest_path: str | Path) -> dict[str, Any]:
             "required_columns": sample_columns,
             "id_column": id_col,
             "target_column": target_col,
+            "default_value": default_output_value,
             "value_constraints": "unknown",
         },
         "unknowns": [],

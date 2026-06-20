@@ -38,7 +38,8 @@ contest folder
 ```text
 factory/                  # 하네스를 만드는 공장 코드
 templates/base_harness/   # 생성될 하네스의 기본 템플릿
-examples/mock_contest_01/ # 실제 문제 공개 전 테스트용 가짜 대회 데이터
+examples/mock_contest_01/ # 다지선다형 테스트용 가짜 대회 데이터
+examples/mock_contest_02/ # 텍스트 분류 테스트용 가짜 대회 데이터
 generated/                # factory 실행 결과물
 docs/                     # 설계/규칙/사람 개입 문서
 skills/                   # Claude/Codex에게 읽힐 작업 절차서
@@ -88,6 +89,14 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python factory/run_factory.py --contest examples/mock_contest_01
+python generated/final_harness/run.py
+pytest
+```
+
+v0.1 안정화용 텍스트 분류 mock contest도 같은 흐름으로 검증합니다.
+
+```bash
+python factory/run_factory.py --contest examples/mock_contest_02
 python generated/final_harness/run.py
 pytest
 ```

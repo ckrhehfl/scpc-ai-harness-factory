@@ -29,7 +29,7 @@ def generate_harness(
         "rules": spec["rules"],
         "solver": {
             "name": "baseline_constant_solver",
-            "default_answer": "1",
+            "default_answer": spec["output"].get("default_value", "1"),
         },
     }
     write_json(out / "configs" / "default.json", config)

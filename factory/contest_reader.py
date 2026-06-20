@@ -17,14 +17,18 @@ def read_csv_meta(path: Path) -> dict[str, Any]:
         except StopIteration:
             columns = []
             row_count = 0
+            first_row = {}
         else:
-            row_count = sum(1 for _ in reader)
+            rows = list(reader)
+            row_count = len(rows)
+            first_row = dict(zip(columns, rows[0])) if rows else {}
 
     return {
         "path": str(path),
         "exists": True,
         "columns": columns,
         "row_count": row_count,
+        "first_row": first_row,
     }
 
 
