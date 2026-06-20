@@ -40,8 +40,10 @@ def test_save_harness_blueprint_writes_yaml_and_markdown(tmp_path):
     assert "recommended_template: base_harness" in yaml_text
     assert "verifier_requirements:" in yaml_text
     assert "human_decisions_required:" in yaml_text
+    assert "override_applied:" in yaml_text
     assert "# Harness Blueprint" in md_text
     assert "## Verifier Requirements" in md_text
+    assert "## Override Applied" in md_text
 
 
 def test_render_harness_blueprint_markdown_includes_required_sections(tmp_path):
@@ -53,3 +55,14 @@ def test_render_harness_blueprint_markdown_includes_required_sections(tmp_path):
     assert "task_type: classification" in text
     assert "recommended_template: base_harness" in text
     assert "## Human Decisions Required" in text
+
+
+def test_blueprint_tracks_overrides_and_reduces_human_decisions(tmp_path):
+    spec = build_contest_spec("examples/mock_contest_02")
+    blueprint = build_harness_blueprint(spec, analyze_gaps(spec), templates_dir=tmp_path)
+
+    assert any("problem.evaluation_metric" in item for item in blueprint["override_applied"])
+    assert any("Final solver policy: local_baseline_only." in item for item in blueprint["solver_requirements"])
+    assert not any("외부 LLM API" in item for item in blueprint["human_decisions_required"])
+    assert not any("최종 제출 solver 선택" in item for item in blueprint["human_decisions_required"])
+    assert any("pretrained_model_allowed" in item for item in blueprint["human_decisions_required"])

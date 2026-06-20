@@ -1,0 +1,19 @@
+rules:
+  external_api_allowed: false
+  external_data_allowed: false
+  pretrained_model_allowed: unknown
+  internet_allowed: false
+
+problem:
+  evaluation_metric: accuracy
+  task_type: classification
+
+output:
+  value_constraints:
+    allowed_labels:
+      - positive
+      - negative
+
+human_decisions:
+  final_solver_policy: local_baseline_only
+  use_external_llm_api: false

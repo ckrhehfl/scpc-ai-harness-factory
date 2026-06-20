@@ -110,6 +110,9 @@ v0.3 Harness Blueprint 단계는 `ContestSpec`과 `GapReport`를 기반으로 `g
 `generated/harness_blueprint.md`를 생성한 뒤 final harness 생성을 진행합니다. Blueprint에는 task type, 추천 템플릿,
 loader/solver/verifier/submitter 요구사항, 사람 확인 필요 항목, 알려진 위험이 포함됩니다.
 
+v0.4 Decision Override 단계는 contest 폴더의 선택 파일인 `contest_overrides.yaml`을 읽어 사람이 확인한 규칙,
+평가 지표, 출력 제약, solver 정책을 `ContestSpec`, `GapReport`, `HarnessBlueprint`에 반영합니다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text
@@ -131,6 +134,7 @@ contests/scpc_2026_round1/
   description.md
   rules.md
   evaluation.md
+  contest_overrides.yaml  # 선택: 사람이 확인한 규칙/평가/출력/solver 결정
   train.csv
   test.csv
   sample_submission.csv
@@ -144,3 +148,32 @@ python generated\final_harness\run.py
 ```
 
 먼저 `generated/gap_report.md`를 확인하고, 규칙상 애매한 부분은 `docs/HUMAN_DECISION_LOG.md`에 기록한 뒤 solver를 개선합니다.
+
+### `contest_overrides.yaml`
+
+대회 시작 후 사람이 확인한 결정은 contest 폴더 안의 `contest_overrides.yaml`에 기록합니다. 지원 항목은 다음과 같습니다.
+
+```yaml
+rules:
+  external_api_allowed: false
+  external_data_allowed: false
+  pretrained_model_allowed: unknown
+  internet_allowed: false
+
+problem:
+  evaluation_metric: accuracy
+  task_type: classification
+
+output:
+  value_constraints:
+    allowed_labels:
+      - positive
+      - negative
+
+human_decisions:
+  final_solver_policy: local_baseline_only
+  use_external_llm_api: false
+```
+
+적용된 override는 `generated/contest_spec.yaml`의 `decision_overrides`, `generated/gap_report.md`의
+`Override 적용`, `generated/harness_blueprint.md`의 `Override Applied`에서 확인합니다.

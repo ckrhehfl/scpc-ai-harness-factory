@@ -38,6 +38,7 @@ def build_harness_blueprint(
 ) -> dict[str, Any]:
     task_type = spec.get("problem", {}).get("task_type", "unknown")
     output = spec.get("output", {})
+    human_decision_values = spec.get("human_decision_values", {})
 
     return {
         "contest_name": spec.get("contest", {}).get("name", "unknown"),
@@ -65,6 +66,7 @@ def build_harness_blueprint(
             "Use a local baseline solver only.",
             "Return one prediction for every loaded test row.",
             "Use default_value when no better local rule is available.",
+            f"Final solver policy: {human_decision_values.get('final_solver_policy', 'unknown')}.",
         ],
         "verifier_requirements": [
             "Verify submission rows are not empty.",
@@ -86,6 +88,7 @@ def build_harness_blueprint(
             for item in spec.get("human_decisions", [])
             if item.get("status") == "pending"
         ],
+        "override_applied": gap_report.get("override_applied", []),
         "known_risks": gap_report.get("risks", []),
     }
 
@@ -137,6 +140,10 @@ def render_harness_blueprint_markdown(blueprint: dict[str, Any]) -> str:
         "## Human Decisions Required",
         "",
         bullet_list(blueprint.get("human_decisions_required", [])),
+        "",
+        "## Override Applied",
+        "",
+        bullet_list(blueprint.get("override_applied", [])),
         "",
         "## Known Risks",
         "",

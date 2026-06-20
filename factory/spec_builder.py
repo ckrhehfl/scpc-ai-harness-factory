@@ -6,6 +6,19 @@ from factory.contest_reader import read_contest_folder
 from factory.utils import write_text, write_json, to_simple_yaml
 
 
+SUPPORTED_OVERRIDE_PATHS = {
+    "rules.external_api_allowed",
+    "rules.external_data_allowed",
+    "rules.pretrained_model_allowed",
+    "rules.internet_allowed",
+    "problem.evaluation_metric",
+    "problem.task_type",
+    "output.value_constraints",
+    "human_decisions.final_solver_policy",
+    "human_decisions.use_external_llm_api",
+}
+
+
 def infer_scalar_type(value: Any) -> str:
     if value in {None, ""}:
         return "empty"
@@ -129,6 +142,71 @@ def infer_default_output_value(sample_submission: dict[str, Any], target_col: st
     return "1", "default_value fell back to '1' because sample_submission target value was empty or unavailable."
 
 
+def is_unknown_value(value: Any) -> bool:
+    return value in {"unknown", None, ""} if isinstance(value, (str, type(None))) else False
+
+
+def iter_override_items(overrides: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
+    items: list[tuple[str, Any]] = []
+    for key, value in overrides.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict) and path != "output.value_constraints":
+            items.extend(iter_override_items(value, path))
+        else:
+            items.append((path, value))
+    return items
+
+
+def set_nested_value(data: dict[str, Any], dotted_path: str, value: Any) -> None:
+    current = data
+    parts = dotted_path.split(".")
+    for part in parts[:-1]:
+        next_value = current.setdefault(part, {})
+        if not isinstance(next_value, dict):
+            raise ValueError(f"Cannot apply override to non-dict path: {dotted_path}")
+        current = next_value
+    current[parts[-1]] = value
+
+
+def apply_decision_overrides(spec: dict[str, Any], raw: dict[str, Any]) -> None:
+    overrides = raw.get("overrides") or {}
+    source_path = raw.get("overrides_path")
+    applied: list[dict[str, Any]] = []
+
+    for path, value in iter_override_items(overrides):
+        if path not in SUPPORTED_OVERRIDE_PATHS:
+            continue
+        if path.startswith("human_decisions."):
+            decision_key = path.split(".", 1)[1]
+            spec["human_decision_values"][decision_key] = value
+        else:
+            set_nested_value(spec, path, value)
+        applied.append({
+            "item": path,
+            "value": value,
+            "source": source_path,
+            "status": "override_applied",
+        })
+
+    if applied:
+        spec["decision_overrides"] = {
+            "source": source_path,
+            "applied": applied,
+        }
+        apply_human_decision_status(spec)
+
+
+def apply_human_decision_status(spec: dict[str, Any]) -> None:
+    values = spec.get("human_decision_values", {})
+    for decision in spec.get("human_decisions", []):
+        key = decision.get("key")
+        if key not in values or is_unknown_value(values.get(key)):
+            continue
+        decision["status"] = "override_applied"
+        decision["selected"] = values[key]
+        decision["reason"] = "contest_overrides.yaml"
+
+
 def build_contest_spec(contest_path: str | Path) -> dict[str, Any]:
     raw = read_contest_folder(contest_path)
     files = enrich_file_metadata(raw["files"])
@@ -178,7 +256,15 @@ def build_contest_spec(contest_path: str | Path) -> dict[str, Any]:
             "value_constraints": "unknown",
         },
         "unknowns": [],
-        "human_decisions": [],
+        "human_decision_values": {
+            "final_solver_policy": "unknown",
+            "use_external_llm_api": "unknown",
+        },
+        "human_decisions": build_human_decisions(),
+        "decision_overrides": {
+            "source": raw.get("overrides_path"),
+            "applied": [],
+        },
         "source_documents": {
             "description_present": bool(raw.get("description")),
             "rules_present": bool(raw.get("rules")),
@@ -186,8 +272,8 @@ def build_contest_spec(contest_path: str | Path) -> dict[str, Any]:
             "all_files": raw.get("all_files", []),
         },
     }
+    apply_decision_overrides(spec, raw)
     spec["unknowns"] = build_unknowns(spec)
-    spec["human_decisions"] = build_human_decisions(spec)
     return spec
 
 
@@ -202,7 +288,7 @@ def build_unknowns(spec: dict[str, Any]) -> list[dict[str, str]]:
         ("output.value_constraints", spec["output"].get("value_constraints"), "제출 값 범위 검증이 필요하다."),
     ]
     for item, value, why in checks:
-        if value in {"unknown", None, ""}:
+        if is_unknown_value(value):
             unknowns.append({
                 "item": item,
                 "why_it_matters": why,
@@ -211,9 +297,10 @@ def build_unknowns(spec: dict[str, Any]) -> list[dict[str, str]]:
     return unknowns
 
 
-def build_human_decisions(spec: dict[str, Any]) -> list[dict[str, Any]]:
+def build_human_decisions() -> list[dict[str, Any]]:
     return [
         {
+            "key": "use_external_llm_api",
             "decision": "외부 LLM API를 final solver에 포함할지 여부",
             "status": "pending",
             "options": ["사용", "미사용", "optional adapter만 유지"],
@@ -221,6 +308,7 @@ def build_human_decisions(spec: dict[str, Any]) -> list[dict[str, Any]]:
             "reason": None,
         },
         {
+            "key": "final_solver_policy",
             "decision": "최종 제출 solver 선택",
             "status": "pending",
             "options": ["baseline", "improved", "ensemble"],

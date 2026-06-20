@@ -11,6 +11,12 @@ def analyze_gaps(spec: dict[str, Any]) -> dict[str, Any]:
     risks: list[str] = []
     human_required: list[str] = []
     schema_summary: list[str] = []
+    override_applied: list[str] = []
+
+    for item in spec.get("decision_overrides", {}).get("applied", []):
+        message = f"{item.get('item')}: override 적용 완료 ({item.get('value')})"
+        confirmed.append(message)
+        override_applied.append(message)
 
     files = spec.get("files", {})
     for key in ["train", "test", "sample_submission"]:
@@ -78,6 +84,7 @@ def analyze_gaps(spec: dict[str, Any]) -> dict[str, Any]:
         "risks": risks,
         "human_required": human_required,
         "schema_summary": schema_summary,
+        "override_applied": override_applied,
     }
 
 
@@ -92,6 +99,7 @@ def render_gap_report(report: dict[str, Any]) -> str:
         "# Gap Report",
         "",
         section("확인 완료", report.get("confirmed", [])),
+        section("Override 적용", report.get("override_applied", [])),
         section("불명확한 항목", report.get("gaps", [])),
         section("사람 확인 필요", report.get("human_required", [])),
         section("규칙상 위험한 항목", report.get("risks", [])),

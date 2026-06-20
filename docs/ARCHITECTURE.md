@@ -7,6 +7,7 @@ Contest Folder
   description.md
   rules.md
   evaluation.md
+  contest_overrides.yaml (optional)
   train.csv
   test.csv
   sample_submission.csv
@@ -14,6 +15,7 @@ Contest Folder
 factory/run_factory.py
         ↓
 Spec Builder
+  + contest_overrides.yaml 반영
         ↓
 generated/contest_spec.yaml
         ↓
@@ -39,20 +41,24 @@ outputs/submission.csv
 
 ### 1. `factory/contest_reader.py`
 
-대회 폴더 안의 파일 목록과 텍스트 문서, CSV 메타데이터를 읽는다.
+대회 폴더 안의 파일 목록과 텍스트 문서, CSV 메타데이터를 읽는다. 선택 파일인 `contest_overrides.yaml`이 있으면
+지원되는 작은 YAML subset으로 읽는다.
 
 ### 2. `factory/spec_builder.py`
 
 읽은 정보를 `contest_spec` 딕셔너리로 정리한다. 현재 MVP에서는 규칙 기반으로 문제 유형을 추정한다.
+`contest_overrides.yaml`에 기록된 사람이 확인한 규칙, 평가 지표, 출력 제약, solver 정책은 `unknowns` 계산 전에 반영한다.
 
 ### 3. `factory/gap_analyzer.py`
 
 공장이 필요로 하는 필수 정보와 현재 spec을 비교해 확인 완료/빈칸/위험/사람 확인 필요 항목을 생성한다.
+override로 해결된 항목은 불명확 항목 대신 적용 완료 항목으로 표시한다.
 
 ### 4. `factory/blueprint_generator.py`
 
 `ContestSpec`과 `GapReport`를 기준으로 실제 하네스 생성 전에 사용할 설계도인 `HarnessBlueprint`를 만든다.
 task type, 입력/출력 컬럼 요약, 추천 템플릿, loader/solver/verifier/submitter 요구사항, 사람 확인 필요 항목과 위험을 정리한다.
+override 적용 항목도 남겨 final harness 생성 전 결정 근거를 확인할 수 있게 한다.
 
 ### 5. `factory/harness_generator.py`
 

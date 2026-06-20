@@ -15,3 +15,17 @@ def test_gap_analyzer_reports_unknowns():
     assert "## 사람 확인 필요" in text
     assert "## 규칙상 위험한 항목" in text
     assert "## 데이터 스키마 요약" in text
+
+
+def test_gap_analyzer_reports_override_applied_items():
+    spec = build_contest_spec("examples/mock_contest_02")
+    report = analyze_gaps(spec)
+
+    assert any("problem.evaluation_metric" in item for item in report["override_applied"])
+    assert not any("problem.evaluation_metric" in item for item in report["gaps"])
+    assert not any("external_api_allowed" in item for item in report["gaps"])
+    assert any("pretrained_model_allowed" in item for item in report["gaps"])
+
+    text = render_gap_report(report)
+    assert "## Override 적용" in text
+    assert "rules.internet_allowed: override 적용 완료 (False)" in text

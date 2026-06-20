@@ -2,6 +2,9 @@
 
 사람의 판단이 필요한 항목을 기록한다. 추후 본선 발표 또는 코드 검증 시 “왜 그렇게 했는지”를 설명하기 위한 근거로 사용한다.
 
+대회 시작 후 확정된 결정은 contest 폴더의 `contest_overrides.yaml`에도 함께 기록한다. Factory는 이 파일을 읽어
+`ContestSpec`, `GapReport`, `HarnessBlueprint`에 override 적용 근거를 남긴다.
+
 ## Decision 001
 
 ### 상황
