@@ -101,6 +101,9 @@ python generated/final_harness/run.py
 pytest
 ```
 
+v0.2 ContestSpec 스키마 분석 검증은 두 mock contest를 모두 실행한 뒤 `generated/contest_spec.yaml`과
+`generated/gap_report.md`에서 컬럼 상세, train/test/sample_submission 컬럼 차이, 제출 형식 추론 근거를 확인합니다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text

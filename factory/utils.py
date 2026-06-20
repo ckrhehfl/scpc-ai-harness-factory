@@ -41,7 +41,11 @@ def to_simple_yaml(data: Any, indent: int = 0) -> str:
     if isinstance(data, dict):
         lines: list[str] = []
         for key, value in data.items():
-            if isinstance(value, (dict, list)):
+            if value == []:
+                lines.append(f"{spaces}{key}: []")
+            elif value == {}:
+                lines.append(f"{spaces}{key}: {{}}")
+            elif isinstance(value, (dict, list)):
                 lines.append(f"{spaces}{key}:")
                 lines.append(to_simple_yaml(value, indent + 1))
             else:
