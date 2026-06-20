@@ -1,0 +1,4 @@
+id,question,choice1,choice2,choice3,choice4,answer
+1,"다음 중 Python 언어에 대한 설명으로 맞는 것은?","컴파일 전용","인터프리터 언어","운영체제","데이터베이스",2
+2,"AI Agent Harness의 주요 역할은?","GPU 제조","입력-계획-검증-출력 관리","CSS 디자인","네트워크 배선",2
+3,"Data leakage에 해당할 수 있는 것은?","train 데이터 검증","test 정답 수작업 추정","문서화","seed 고정",2

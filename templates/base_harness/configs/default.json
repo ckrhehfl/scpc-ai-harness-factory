@@ -1,0 +1,22 @@
+{
+  "contest_source_path": "examples/mock_contest_01",
+  "task_type": "multiple_choice",
+  "input_modalities": ["text"],
+  "output": {
+    "required_file": "submission.csv",
+    "required_columns": ["id", "answer"],
+    "id_column": "id",
+    "target_column": "answer",
+    "value_constraints": "unknown"
+  },
+  "rules": {
+    "external_api_allowed": "unknown",
+    "external_data_allowed": "unknown",
+    "pretrained_model_allowed": "unknown",
+    "internet_allowed": "unknown"
+  },
+  "solver": {
+    "name": "baseline_constant_solver",
+    "default_answer": "1"
+  }
+}

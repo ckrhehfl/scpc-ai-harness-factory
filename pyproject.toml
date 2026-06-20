@@ -1,0 +1,10 @@
+[project]
+name = "scpc-ai-harness-factory"
+version = "0.1.0"
+description = "Meta-Harness Factory MVP for SCPC AI Challenge"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

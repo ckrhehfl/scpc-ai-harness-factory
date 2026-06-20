@@ -1,0 +1,3 @@
+id,question,choice1,choice2,choice3,choice4
+101,"하네스 공장의 첫 산출물로 적절한 것은?","contest_spec","자동 머지","게임 서버","UI 테마"
+102,"대회 규칙이 불명확할 때 해야 할 일은?","임의로 진행","unknowns에 기록","무시","test 라벨링"
