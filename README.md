@@ -45,14 +45,50 @@ skills/                   # Claude/Codex에게 읽힐 작업 절차서
 tests/                    # MVP 검증용 테스트
 ```
 
+## `.venv` 관리 원칙
+
+`.venv`는 로컬 전용 Python 가상환경입니다. GitHub에 올리지 않고, 각 개발 환경에서 새로 만듭니다.
+
+- Windows에서 만든 `.venv`와 WSL/Linux에서 만든 `.venv`는 내부 구조가 다르므로 서로 재사용하지 않습니다.
+- PC와 노트북을 오갈 때 `.venv` 폴더를 복사하지 않습니다. 각 기기에서 `python -m venv .venv` 또는 `python3 -m venv .venv`로 새로 만듭니다.
+- 동일 환경을 재현하는 기준은 `.venv` 폴더가 아니라 `requirements.txt`입니다.
+- `generated/`와 `runs/`는 실행 산출물이므로 기본적으로 GitHub에 올리지 않습니다. `factory/run_factory.py`를 실행하면 다시 생성할 수 있어야 합니다.
+
 ## 빠른 실행
 
+### Windows CMD
+
 ```bat
+cd /d C:\Dev\scpc-ai-harness-factory
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python factory\run_factory.py --contest examples\mock_contest_01
 python generated\final_harness\run.py
+pytest
+```
+
+### PowerShell
+
+```powershell
+cd C:\Dev\scpc-ai-harness-factory
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python factory\run_factory.py --contest examples\mock_contest_01
+python generated\final_harness\run.py
+pytest
+```
+
+### WSL/Linux
+
+```bash
+cd /mnt/c/Dev/scpc-ai-harness-factory
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python factory/run_factory.py --contest examples/mock_contest_01
+python generated/final_harness/run.py
 pytest
 ```
 
