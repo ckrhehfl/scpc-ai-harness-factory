@@ -9,6 +9,14 @@
     "target_column": "answer",
     "value_constraints": "unknown"
   },
+  "verifier": {
+    "test_csv_path": "examples/mock_contest_01/test.csv",
+    "sample_submission_csv_path": "examples/mock_contest_01/sample_submission.csv",
+    "required_columns": ["id", "answer"],
+    "id_column": "id",
+    "target_column": "answer",
+    "value_constraints": "unknown"
+  },
   "rules": {
     "external_api_allowed": "unknown",
     "external_data_allowed": "unknown",

@@ -27,6 +27,14 @@ def generate_harness(
         "task_type": spec["problem"]["task_type"],
         "input_modalities": spec["problem"].get("input_modalities", []),
         "output": spec["output"],
+        "verifier": {
+            "test_csv_path": str(Path(spec["contest"]["source_path"]) / "test.csv"),
+            "sample_submission_csv_path": str(Path(spec["contest"]["source_path"]) / "sample_submission.csv"),
+            "required_columns": spec["output"].get("required_columns", []),
+            "id_column": spec["output"].get("id_column"),
+            "target_column": spec["output"].get("target_column"),
+            "value_constraints": spec["output"].get("value_constraints"),
+        },
         "rules": spec["rules"],
         "solver": {
             "name": "baseline_constant_solver",
