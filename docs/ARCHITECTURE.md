@@ -212,6 +212,62 @@ python factory/run_contest_package_coverage.py \
 
 이 단계는 `factory/run_factory.py` 흐름에 자동 결합되지 않는다.
 
+### 11H. `capabilities/registry.json`
+
+v0.10A Capability Registry source다. Maintainer가 현재 factory와 base harness가 제공하는 좁은 능력을
+stable `cap.<scope>.<stable_name>` ID로 선언한다. 각 record는 scope, category, declared status, provides token,
+inputs/outputs, implementation evidence, test evidence, dependencies, risk gates, limitations, tags를 담는다.
+
+이 파일은 Contest Requirement가 아니며, 특정 대회 요구사항과 capability를 자동 매칭하지 않는다.
+외부 API 실행, Dacon crawling/upload, OCR, Decision Ledger, Human Approval Summary, 자동 git/Codex 실행 능력은
+등록하지 않는다.
+
+### 11I. `factory/capability_model.py`
+
+Capability Registry의 schema와 정적 evidence 규칙을 검증한다. 허용 scope/category/status, capability ID,
+provides token, dependency 존재/순환, evidence path 안전성을 확인한다.
+
+Evidence path는 repository root 기준 POSIX 상대 경로만 허용하고 absolute path, Windows drive path, `..`,
+`.git/`, `generated/`, `runs/`, `.venv/`, `contests/`, env/secret/credential 경로, directory, repository 밖으로
+resolve되는 symlink를 거부한다.
+
+Python evidence file은 import하지 않고 표준 라이브러리 `ast`로 parse해서 top-level `FunctionDef`,
+`AsyncFunctionDef`, `ClassDef` symbol 존재만 확인한다. 이 검증은 symbol 존재를 확인할 뿐 동작 의미를
+증명하지 않는다.
+
+### 11J. `factory/capability_registry_builder.py`와 `factory/run_capability_registry.py`
+
+`capability_registry_builder.py`는 source registry를 로드하고 repository evidence audit을 수행한 뒤
+계산 상태를 붙인다.
+
+```text
+verification_status: verified | incomplete | not_applicable
+matching_eligibility: eligible | limited | ineligible
+```
+
+생성 output은 capability ID 순서로 정렬하고 생성 시각, 절대 repository path, 로컬 사용자명을 포함하지 않는다.
+동일 입력에서는 byte-for-byte deterministic한 JSON/Markdown을 생성한다.
+
+독립 CLI:
+
+```bash
+python factory/run_capability_registry.py \
+  --registry capabilities/registry.json \
+  --repo-root . \
+  --output generated
+```
+
+Exit code:
+
+```text
+0: registry 생성, incomplete capability 없음
+1: structural/IO 오류, output 생성 안 함
+2: registry 생성, incomplete capability 존재
+```
+
+이 단계는 `factory/run_factory.py`와 자동 결합되지 않으며 ContestSpec, GapReport, HarnessBlueprint,
+final harness, `contest_overrides.yaml`을 수정하지 않는다.
+
 ### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.

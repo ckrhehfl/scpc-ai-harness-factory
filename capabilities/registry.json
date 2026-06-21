@@ -1,0 +1,912 @@
+{
+  "schema_version": "v0.10A",
+  "artifact_type": "capability_registry_definition",
+  "capabilities": [
+    {
+      "capability_id": "cap.factory.ai_analysis_intake_review",
+      "name": "AI analysis intake and review artifact generation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Parses a fenced AI analysis payload, classifies override candidates, and emits review artifacts without applying decisions.",
+      "provides": [
+        "ai.analysis.payload.extract",
+        "ai.analysis.override.candidate.classify",
+        "ai.analysis.review.emit"
+      ],
+      "inputs": [
+        "analysis_response_markdown",
+        "contest_directory"
+      ],
+      "outputs": [
+        "ai_analysis_candidates.json",
+        "ai_analysis_review.md",
+        "contest_overrides.proposed.yaml",
+        "code_agent_task_plan.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/ai_analysis_intake.py",
+          "symbols": [
+            "extract_machine_payload",
+            "classify_override_candidates",
+            "build_analysis_candidates",
+            "save_analysis_review_outputs"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_ai_analysis_intake.py",
+          "symbols": [
+            "test_extract_machine_payload_parses_valid_response",
+            "test_supported_override_path_is_accepted",
+            "test_real_contest_overrides_file_is_not_modified",
+            "test_code_agent_task_plan_generation"
+          ]
+        },
+        {
+          "path": "tests/test_run_ai_analysis_review.py",
+          "symbols": [
+            "test_cli_success_generates_outputs",
+            "test_cli_invalid_response_returns_non_zero"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_spec_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "AI response content is treated as candidate data and is not semantically validated.",
+        "Accepted override candidates are written to a proposed file only and are not applied to contest_overrides.yaml."
+      ],
+      "tags": [
+        "offline",
+        "human_review"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.ai_problem_prompt_generation",
+      "name": "AI problem-analysis prompt generation",
+      "scope": "factory",
+      "category": "handoff",
+      "declared_status": "implemented",
+      "description": "Builds a static prompt package from scan, spec, gap, and blueprint artifacts for external human-mediated AI analysis.",
+      "provides": [
+        "ai.problem.prompt.render",
+        "contest.artifacts.context.summarize"
+      ],
+      "inputs": [
+        "input_scan_report",
+        "contest_spec",
+        "gap_report",
+        "harness_blueprint"
+      ],
+      "outputs": [
+        "ai_problem_analysis_prompt.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/ai_problem_analyzer.py",
+          "symbols": [
+            "build_problem_analysis_prompt",
+            "save_ai_problem_analysis_prompt"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_ai_problem_analyzer.py",
+          "symbols": [
+            "test_problem_analysis_prompt_contains_required_context_and_requests"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.input_scan",
+        "cap.factory.contest_spec_generation",
+        "cap.factory.gap_analysis",
+        "cap.factory.harness_blueprint_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "The factory only writes a prompt and does not call an external AI service.",
+        "Long source text is truncated for prompt size control."
+      ],
+      "tags": [
+        "offline",
+        "prompt"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.base_harness_generation",
+      "name": "Base harness generation",
+      "scope": "factory",
+      "category": "generation",
+      "declared_status": "implemented",
+      "description": "Copies the base harness template and writes a config derived from ContestSpec and optional blueprint data.",
+      "provides": [
+        "harness.template.copy",
+        "harness.config.write"
+      ],
+      "inputs": [
+        "contest_spec",
+        "harness_blueprint"
+      ],
+      "outputs": [
+        "generated/final_harness"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/harness_generator.py",
+          "symbols": [
+            "generate_harness"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_harness_generator.py",
+          "symbols": [
+            "test_generate_harness",
+            "test_generated_harness_runs_for_text_classification"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_spec_generation",
+        "cap.factory.harness_blueprint_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Generation is template copying plus config writing; it does not synthesize custom solver logic.",
+        "Existing output directory is replaced by the generator when invoked."
+      ],
+      "tags": [
+        "offline",
+        "deterministic"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.code_agent_work_package_generation",
+      "name": "Code Agent work-package generation",
+      "scope": "factory",
+      "category": "handoff",
+      "declared_status": "implemented",
+      "description": "Builds a bounded implementation prompt and context JSON from reviewed AI analysis candidates and factory artifacts.",
+      "provides": [
+        "code_agent.context.write",
+        "code_agent.prompt.write",
+        "code_agent.allowed_files.filter"
+      ],
+      "inputs": [
+        "contest_directory",
+        "ai_analysis_candidates.json",
+        "generated_factory_artifacts"
+      ],
+      "outputs": [
+        "code_agent_context.json",
+        "code_agent_implementation_prompt.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/code_agent_prompt_builder.py",
+          "symbols": [
+            "build_code_agent_work_package",
+            "save_code_agent_work_package",
+            "classify_task_file_path"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_code_agent_prompt_builder.py",
+          "symbols": [
+            "test_context_json_contains_required_structure",
+            "test_unsafe_task_paths_are_excluded_and_warned",
+            "test_builder_does_not_modify_real_contest_overrides",
+            "test_builder_does_not_modify_source_artifacts"
+          ]
+        },
+        {
+          "path": "tests/test_run_code_agent_prompt.py",
+          "symbols": [
+            "test_cli_success_generates_two_outputs"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.ai_analysis_intake_review"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "The package is a prompt handoff artifact and does not execute Codex or shell commands.",
+        "Allowed file filtering is path-based and does not prove that future code changes are correct."
+      ],
+      "tags": [
+        "offline",
+        "handoff"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.contest_spec_generation",
+      "name": "ContestSpec generation",
+      "scope": "factory",
+      "category": "normalization",
+      "declared_status": "implemented",
+      "description": "Builds a deterministic ContestSpec from contest files, inferred CSV schema, output columns, and supported overrides.",
+      "provides": [
+        "contest.spec.generate",
+        "contest.schema.summarize",
+        "contest.output.infer"
+      ],
+      "inputs": [
+        "contest_directory"
+      ],
+      "outputs": [
+        "contest_spec.yaml",
+        "contest_spec.json"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/spec_builder.py",
+          "symbols": [
+            "build_contest_spec",
+            "build_schema_summary",
+            "infer_task_type",
+            "infer_id_target_columns",
+            "save_contest_spec"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_spec_builder.py",
+          "symbols": [
+            "test_build_contest_spec_mock_contest",
+            "test_build_contest_spec_mock_contest_text_classification"
+          ]
+        }
+      ],
+      "dependencies": [],
+      "risk_gates": [],
+      "limitations": [
+        "Task type and output inference are heuristic and based on available files.",
+        "Unknown official rules remain unknown unless supported overrides are present."
+      ],
+      "tags": [
+        "offline",
+        "deterministic"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.evidence_index_generation",
+      "name": "Evidence index generation",
+      "scope": "factory",
+      "category": "audit",
+      "declared_status": "implemented",
+      "description": "Converts input scan facts into deterministic evidence records for inventory, structure, document chunks, and preview errors.",
+      "provides": [
+        "evidence.index.build",
+        "evidence.record.validate"
+      ],
+      "inputs": [
+        "input_scan_report.json"
+      ],
+      "outputs": [
+        "evidence_index.json",
+        "evidence_index.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/evidence_index_builder.py",
+          "symbols": [
+            "build_evidence_index",
+            "render_evidence_index_markdown",
+            "save_evidence_index"
+          ]
+        },
+        {
+          "path": "factory/evidence_model.py",
+          "symbols": [
+            "validate_evidence_record",
+            "validate_evidence_index"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_evidence_index_builder.py",
+          "symbols": [
+            "test_build_evidence_index_projects_all_supported_scan_facts",
+            "test_build_evidence_index_order_and_full_output_are_deterministic"
+          ]
+        },
+        {
+          "path": "tests/test_run_evidence_index.py",
+          "symbols": [
+            "test_cli_generates_json_and_markdown_for_valid_input"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.input_scan"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Evidence records capture observed static facts only.",
+        "AI inference and human decisions are not included in the evidence index."
+      ],
+      "tags": [
+        "offline",
+        "deterministic",
+        "audit"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.gap_analysis",
+      "name": "Gap analysis",
+      "scope": "factory",
+      "category": "analysis",
+      "declared_status": "implemented",
+      "description": "Summarizes confirmed facts, unknowns, risks, schema details, and human-required checks from ContestSpec.",
+      "provides": [
+        "contest.gaps.report",
+        "contest.risks.summarize"
+      ],
+      "inputs": [
+        "contest_spec"
+      ],
+      "outputs": [
+        "gap_report.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/gap_analyzer.py",
+          "symbols": [
+            "analyze_gaps",
+            "render_gap_report",
+            "save_gap_report"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_gap_analyzer.py",
+          "symbols": [
+            "test_gap_analyzer_reports_unknowns",
+            "test_gap_analyzer_reports_override_applied_items"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_spec_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Gap analysis reports unknowns from the current ContestSpec and does not resolve official rules.",
+        "Risk messages are conservative static guidance, not legal or contest-official validation."
+      ],
+      "tags": [
+        "offline",
+        "report"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.harness_blueprint_generation",
+      "name": "Harness blueprint generation",
+      "scope": "factory",
+      "category": "design",
+      "declared_status": "implemented",
+      "description": "Builds a harness blueprint with template recommendation, loader/solver/verifier/submitter requirements, risks, and pending decisions.",
+      "provides": [
+        "harness.blueprint.build",
+        "harness.template.recommend"
+      ],
+      "inputs": [
+        "contest_spec",
+        "gap_report"
+      ],
+      "outputs": [
+        "harness_blueprint.yaml",
+        "harness_blueprint.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/blueprint_generator.py",
+          "symbols": [
+            "build_harness_blueprint",
+            "select_recommended_template",
+            "save_harness_blueprint"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_blueprint_generator.py",
+          "symbols": [
+            "test_build_harness_blueprint_from_multiple_choice_spec",
+            "test_blueprint_tracks_overrides_and_reduces_human_decisions"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_spec_generation",
+        "cap.factory.gap_analysis"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Blueprint requirements are derived from current static artifacts and do not prove final solver adequacy.",
+        "Template selection falls back to base_harness when specialized templates are absent."
+      ],
+      "tags": [
+        "offline",
+        "design"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.human_override_application",
+      "name": "Human decision override application",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Applies supported contest_overrides.yaml fields into ContestSpec and marks corresponding human decision values.",
+      "provides": [
+        "contest.override.apply",
+        "human.decision.status.update"
+      ],
+      "inputs": [
+        "contest_overrides.yaml",
+        "contest_spec"
+      ],
+      "outputs": [
+        "contest_spec.decision_overrides",
+        "contest_spec.human_decision_values"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/spec_builder.py",
+          "symbols": [
+            "apply_decision_overrides",
+            "apply_human_decision_status",
+            "iter_override_items",
+            "set_nested_value"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_spec_builder.py",
+          "symbols": [
+            "test_contest_overrides_resolve_unknowns_for_supported_fields",
+            "test_new_rule_overrides_apply_only_from_contest_overrides"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_spec_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Only explicitly supported dotted paths are applied.",
+        "Overrides are read from contest files and are not inferred or auto-written by this capability."
+      ],
+      "tags": [
+        "offline",
+        "human_controlled"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.input_scan",
+      "name": "Contest package input scanning",
+      "scope": "factory",
+      "category": "intake",
+      "declared_status": "implemented",
+      "description": "Scans contest package files and emits deterministic metadata, CSV/JSON previews, document excerpts, and document chunks.",
+      "provides": [
+        "contest.input.scan",
+        "file.inventory.collect",
+        "document.chunk.extract"
+      ],
+      "inputs": [
+        "contest_directory"
+      ],
+      "outputs": [
+        "input_scan_report.json",
+        "input_scan_report.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/input_scanner.py",
+          "symbols": [
+            "scan_contest_inputs",
+            "scan_file",
+            "read_csv_preview",
+            "read_document_chunks"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_input_scanner.py",
+          "symbols": [
+            "test_scan_contest_inputs_collects_files_documents_and_csv_preview",
+            "test_scan_contest_inputs_detects_json_jsonl_and_media",
+            "test_document_chunks_cover_full_text_deterministically_and_keep_excerpt"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.package_manifest_validation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Image and binary document content is classified by file type but not semantically interpreted.",
+        "Document processing is deterministic text extraction and chunking only."
+      ],
+      "tags": [
+        "offline",
+        "deterministic"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.package_coverage_audit",
+      "name": "Contest package coverage audit",
+      "scope": "factory",
+      "category": "audit",
+      "declared_status": "implemented",
+      "description": "Audits manifest sources, scan artifacts, evidence records, core ContestSpec fields, high-risk unknowns, and not-modeled topics.",
+      "provides": [
+        "contest.package.coverage.audit",
+        "contest.source.coverage.link"
+      ],
+      "inputs": [
+        "contest_directory",
+        "input_scan_report.json",
+        "evidence_index.json",
+        "contest_spec.json"
+      ],
+      "outputs": [
+        "contest_package_coverage.json",
+        "contest_package_coverage.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/contest_package_coverage.py",
+          "symbols": [
+            "build_contest_package_coverage",
+            "render_contest_package_coverage_markdown",
+            "save_contest_package_coverage"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_contest_package_coverage.py",
+          "symbols": [
+            "test_coverage_links_manifest_sources_scan_and_evidence",
+            "test_coverage_classifies_core_fields_declared_unknowns_and_risks",
+            "test_coverage_does_not_modify_input_artifacts"
+          ]
+        },
+        {
+          "path": "tests/test_run_contest_package_coverage.py",
+          "symbols": [
+            "test_cli_generates_coverage_outputs"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.package_manifest_validation",
+        "cap.factory.input_scan",
+        "cap.factory.evidence_index_generation",
+        "cap.factory.contest_spec_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Coverage status links static artifacts and does not confirm official contest requirements.",
+        "Known not-modeled topics are reported instead of modeled into ContestSpec."
+      ],
+      "tags": [
+        "offline",
+        "audit"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.package_manifest_validation",
+      "name": "Contest package manifest validation",
+      "scope": "factory",
+      "category": "intake",
+      "declared_status": "implemented",
+      "description": "Loads and validates contest_package.json source declarations, source path safety, source kinds, visibility, and declared unknown paths.",
+      "provides": [
+        "contest.package.manifest.load",
+        "contest.package.manifest.validate",
+        "contest.source.map.build"
+      ],
+      "inputs": [
+        "contest_package.json",
+        "contest_directory"
+      ],
+      "outputs": [
+        "manifest_source_map"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/contest_package_manifest.py",
+          "symbols": [
+            "load_contest_package_manifest",
+            "validate_contest_package_manifest",
+            "build_manifest_source_map"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_contest_package_manifest.py",
+          "symbols": [
+            "test_loads_valid_manifest_and_builds_source_map",
+            "test_rejects_malformed_json",
+            "test_rejects_invalid_manifest_shapes",
+            "test_rejects_manifest_as_source"
+          ]
+        }
+      ],
+      "dependencies": [],
+      "risk_gates": [],
+      "limitations": [
+        "Manifest schema is limited to the current v0.9B contest_package.json contract.",
+        "Validation checks source declaration structure and file presence, not source content truth."
+      ],
+      "tags": [
+        "offline",
+        "deterministic"
+      ]
+    },
+    {
+      "capability_id": "cap.generated_harness.constant_baseline_prediction",
+      "name": "Generated harness constant baseline prediction",
+      "scope": "generated_harness",
+      "category": "runtime",
+      "declared_status": "implemented",
+      "description": "Uses the base harness BaselineSolver to emit one constant target value per loaded task while preserving id values.",
+      "provides": [
+        "harness.baseline.constant.predict",
+        "harness.prediction.rows.emit"
+      ],
+      "inputs": [
+        "loaded_test_rows",
+        "harness_config"
+      ],
+      "outputs": [
+        "prediction_rows"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "templates/base_harness/src/solver.py",
+          "symbols": [
+            "BaselineSolver"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_harness_generator.py",
+          "symbols": [
+            "test_generated_harness_runs_for_text_classification"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.generated_harness.csv_loading"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "The baseline is constant and intentionally does not optimize score.",
+        "Prediction quality depends entirely on the configured default answer."
+      ],
+      "tags": [
+        "offline",
+        "baseline"
+      ]
+    },
+    {
+      "capability_id": "cap.generated_harness.csv_loading",
+      "name": "Generated harness CSV loading",
+      "scope": "generated_harness",
+      "category": "runtime",
+      "declared_status": "implemented",
+      "description": "Loads generated harness JSON config and reads contest test.csv rows with CSV DictReader.",
+      "provides": [
+        "harness.config.load",
+        "harness.test_csv.load"
+      ],
+      "inputs": [
+        "configs/default.json",
+        "test.csv"
+      ],
+      "outputs": [
+        "task_rows"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "templates/base_harness/src/loader.py",
+          "symbols": [
+            "load_config",
+            "load_tasks"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_harness_generator.py",
+          "symbols": [
+            "test_generated_harness_runs_for_text_classification"
+          ]
+        }
+      ],
+      "dependencies": [],
+      "risk_gates": [],
+      "limitations": [
+        "Only test.csv loading is implemented in the base harness.",
+        "CSV parsing relies on header names and does not perform feature validation."
+      ],
+      "tags": [
+        "offline",
+        "runtime"
+      ]
+    },
+    {
+      "capability_id": "cap.generated_harness.submission_csv_writing",
+      "name": "Generated harness submission CSV writing",
+      "scope": "generated_harness",
+      "category": "runtime",
+      "declared_status": "implemented",
+      "description": "Writes submission rows to a CSV file using configured required column order.",
+      "provides": [
+        "submission.csv.write",
+        "submission.columns.order"
+      ],
+      "inputs": [
+        "prediction_rows",
+        "harness_config"
+      ],
+      "outputs": [
+        "submission.csv"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "templates/base_harness/src/submitter.py",
+          "symbols": [
+            "write_submission"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_harness_generator.py",
+          "symbols": [
+            "test_generated_harness_runs_for_text_classification"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.generated_harness.constant_baseline_prediction"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Only configured required columns are written.",
+        "Missing row values are written as empty strings unless caught by later verification."
+      ],
+      "tags": [
+        "offline",
+        "runtime"
+      ]
+    },
+    {
+      "capability_id": "cap.generated_harness.submission_verification",
+      "name": "Generated harness submission verification",
+      "scope": "generated_harness",
+      "category": "verification",
+      "declared_status": "implemented",
+      "description": "Checks submission existence, required columns, sample column order, row count, id uniqueness, id match, target emptiness, and allowed labels when configured.",
+      "provides": [
+        "submission.schema.verify",
+        "submission.row_count.verify",
+        "submission.id_values.verify",
+        "submission.target_values.verify"
+      ],
+      "inputs": [
+        "submission.csv",
+        "test.csv",
+        "sample_submission.csv",
+        "harness_config"
+      ],
+      "outputs": [
+        "validation_report"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "templates/base_harness/src/verifier.py",
+          "symbols": [
+            "verify_submission_rows",
+            "build_validation_report"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_submission_verifier.py",
+          "symbols": [
+            "test_valid_submission_passes",
+            "test_missing_required_column_fails",
+            "test_row_count_mismatch_fails",
+            "test_duplicate_id_fails",
+            "test_allowed_labels_outside_value_fails"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.generated_harness.submission_csv_writing"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Verification checks structural submission properties only.",
+        "It does not verify model accuracy or official leaderboard scoring."
+      ],
+      "tags": [
+        "offline",
+        "verification"
+      ]
+    },
+    {
+      "capability_id": "cap.generated_harness.validation_report_emission",
+      "name": "Generated harness validation report emission",
+      "scope": "generated_harness",
+      "category": "verification",
+      "declared_status": "implemented",
+      "description": "Writes validation report JSON and Markdown from generated harness verifier results.",
+      "provides": [
+        "submission.validation_report.write",
+        "submission.validation_report.markdown"
+      ],
+      "inputs": [
+        "validation_report"
+      ],
+      "outputs": [
+        "validation_report.json",
+        "validation_report.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "templates/base_harness/src/verifier.py",
+          "symbols": [
+            "write_validation_report",
+            "render_validation_report_markdown"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_harness_generator.py",
+          "symbols": [
+            "test_generated_harness_runs_for_text_classification"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.generated_harness.submission_verification"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Reports reflect the local verifier checks only.",
+        "The report does not represent human approval or official contest submission validation."
+      ],
+      "tags": [
+        "offline",
+        "verification"
+      ]
+    }
+  ]
+}

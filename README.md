@@ -141,6 +141,43 @@ local Contest Package source로 등록하고, Input Scanner/Evidence Index/Conte
 별도 coverage report로 점검합니다. 공식 문구나 manifest 선언은 자동으로 승인된 결정이 아니며,
 `contest_overrides.yaml`을 자동 수정하지 않습니다. 이 단계도 `factory/run_factory.py` 흐름에 자동 결합하지 않습니다.
 
+v0.10A Capability Registry 단계는 현재 factory와 생성되는 base harness가 실제로 제공하는 좁은 능력을
+stable Capability ID로 선언하고, 각 capability의 구현 코드와 테스트 symbol이 저장소에 존재하는지
+표준 라이브러리 `ast`로 정적으로 검증합니다. Contest Requirement와 Capability를 자동 매칭하지 않고,
+Blueprint, GapReport, final harness, `contest_overrides.yaml`도 변경하지 않습니다. 이 단계는
+`factory/run_factory.py` 흐름에 자동 결합하지 않습니다.
+
+```bash
+python factory/run_capability_registry.py \
+  --registry capabilities/registry.json \
+  --repo-root . \
+  --output generated
+```
+
+생성 산출물:
+
+```text
+generated/capability_registry.json
+generated/capability_registry.md
+```
+
+Capability Registry와 Contest Requirement는 다릅니다. Capability Registry는 "공장이 현재 무엇을 할 수
+있고 그 코드/테스트 근거가 저장소에 있는가"를 선언하고 감사합니다. Contest Requirement는 특정 대회가
+요구하거나 금지하는 조건입니다. Requirement Matcher는 아직 구현하지 않았습니다.
+
+상태 의미:
+
+- `declared_status`: maintainer가 선언한 구현 상태입니다. `implemented`, `partial`, `planned`, `deprecated`를 사용합니다.
+- `verification_status`: 선언된 code/test evidence path와 Python top-level symbol 존재 여부입니다. `verified`, `incomplete`, `not_applicable`를 사용합니다.
+- `matching_eligibility`: 향후 matcher가 사용할 수 있는 정도입니다. `eligible`, `limited`, `ineligible`를 사용합니다.
+
+`verified`는 코드 및 테스트 근거가 저장소에서 확인됐다는 뜻입니다. 공식 대회 규칙 확인, 사람 승인,
+모든 대회 지원 또는 solver 성능 보장을 뜻하지 않습니다.
+
+초기 registry 범위는 manifest validation, input scanning, ContestSpec/override/gap/blueprint/harness 생성,
+Evidence Index, coverage audit, AI prompt/intake/review, Code Agent work-package, base harness의 CSV loading,
+constant baseline prediction, submission writing, submission verification, validation report emission입니다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text
