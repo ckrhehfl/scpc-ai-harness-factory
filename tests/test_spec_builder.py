@@ -54,6 +54,54 @@ def test_contest_overrides_resolve_unknowns_for_supported_fields():
     assert "rules.pretrained_model_allowed" in unknown_items
 
 
+def test_allowed_language_is_unknown_without_python_in_rules(tmp_path):
+    contest = tmp_path / "contest"
+    contest.mkdir()
+    (contest / "rules.md").write_text("", encoding="utf-8")
+    (contest / "train.csv").write_text("id,label\n1,A\n", encoding="utf-8")
+    (contest / "test.csv").write_text("id\n2\n", encoding="utf-8")
+    (contest / "sample_submission.csv").write_text("id,label\n2,A\n", encoding="utf-8")
+
+    spec = build_contest_spec(contest)
+    assert spec["rules"]["allowed_language"] == "unknown"
+    assert any(item["item"] == "rules.allowed_language" for item in spec["unknowns"])
+
+
+def test_allowed_language_is_python_only_when_rules_mention_python(tmp_path):
+    contest = tmp_path / "contest"
+    contest.mkdir()
+    (contest / "rules.md").write_text("Submissions must use Python.", encoding="utf-8")
+    (contest / "train.csv").write_text("id,label\n1,A\n", encoding="utf-8")
+    (contest / "test.csv").write_text("id\n2\n", encoding="utf-8")
+    (contest / "sample_submission.csv").write_text("id,label\n2,A\n", encoding="utf-8")
+
+    assert build_contest_spec(contest)["rules"]["allowed_language"] == "Python"
+
+
+def test_new_rule_overrides_apply_only_from_contest_overrides(tmp_path):
+    contest = tmp_path / "contest"
+    contest.mkdir()
+    (contest / "rules.md").write_text("No language listed.", encoding="utf-8")
+    (contest / "train.csv").write_text("id,label\n1,A\n", encoding="utf-8")
+    (contest / "test.csv").write_text("id\n2\n", encoding="utf-8")
+    (contest / "sample_submission.csv").write_text("id,label\n2,A\n", encoding="utf-8")
+
+    spec_without_override = build_contest_spec(contest)
+    assert spec_without_override["rules"]["allowed_language"] == "unknown"
+    assert spec_without_override["rules"]["manual_labeling_allowed"] == "unknown"
+
+    (contest / "contest_overrides.yaml").write_text(
+        "rules:\n  allowed_language: Python\n  manual_labeling_allowed: false\n",
+        encoding="utf-8",
+    )
+    spec = build_contest_spec(contest)
+    assert spec["rules"]["allowed_language"] == "Python"
+    assert spec["rules"]["manual_labeling_allowed"] is False
+    applied = {item["item"] for item in spec["decision_overrides"]["applied"]}
+    assert "rules.allowed_language" in applied
+    assert "rules.manual_labeling_allowed" in applied
+
+
 def test_simple_yaml_renders_empty_lists_explicitly():
     text = to_simple_yaml({"schema": {"test_only_columns": []}})
     assert "test_only_columns: []" in text

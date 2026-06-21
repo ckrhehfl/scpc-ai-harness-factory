@@ -66,6 +66,23 @@ def scan_report_fixture() -> dict:
                     "excerpt": "Use exact labels.",
                     "truncated": False,
                 },
+                "document_chunks": [
+                    {
+                        "char_start": 0,
+                        "char_end": 10,
+                        "text": "Use exact ",
+                    },
+                    {
+                        "char_start": 10,
+                        "char_end": 17,
+                        "text": "labels.",
+                    },
+                ],
+                "declared_source": {
+                    "role": "official_notice",
+                    "source_kind": "document",
+                    "visibility": "public",
+                },
             },
             {
                 "path": "broken.json",
@@ -85,6 +102,13 @@ def records_by_type(index: dict) -> dict[str, dict]:
     return {record["key"].rsplit(":", 1)[-1]: record for record in index["records"]}
 
 
+def evidence_type(record: dict) -> str:
+    suffix = record["key"][len(f"file:{record['source_file']}:") :]
+    if suffix.startswith("document_chunk:"):
+        return "document_chunk"
+    return suffix
+
+
 def test_build_evidence_index_projects_all_supported_scan_facts():
     index = build_evidence_index(scan_report_fixture(), source_artifact="generated/input_scan_report.json")
     validate_evidence_index(index)
@@ -94,12 +118,13 @@ def test_build_evidence_index_projects_all_supported_scan_facts():
     assert index["record_count"] == len(index["records"])
     assert len({record["evidence_id"] for record in index["records"]}) == len(index["records"])
 
-    all_types = [record["key"].rsplit(":", 1)[-1] for record in index["records"]]
+    all_types = [evidence_type(record) for record in index["records"]]
     assert all_types.count("inventory") == 5
     assert "csv_structure" in all_types
     assert "json_structure" in all_types
     assert "jsonl_structure" in all_types
     assert "document_excerpt" in all_types
+    assert all_types.count("document_chunk") == 2
     assert "preview_error" in all_types
 
 
@@ -128,6 +153,13 @@ def test_build_evidence_index_maps_preview_payloads_and_excludes_scanner_candida
     assert doc_record["location"]["char_end"] == len("Use exact labels.")
     assert doc_record["observed_value"]["excerpt"] == "Use exact labels."
 
+    chunk_record = by_key["file:rules.md:document_chunk:0:10"]
+    assert chunk_record["location"]["scope"] == "document_chunk"
+    assert chunk_record["location"]["char_start"] == 0
+    assert chunk_record["location"]["char_end"] == 10
+    assert chunk_record["observed_value"] == {"text": "Use exact "}
+    assert by_key["file:rules.md:document_chunk:10:17"]["evidence_id"] != chunk_record["evidence_id"]
+
     error_record = by_key["file:broken.json:preview_error"]
     assert error_record["observed_value"] == "preview_failed: bad json"
 
@@ -136,6 +168,8 @@ def test_build_evidence_index_maps_preview_payloads_and_excludes_scanner_candida
             assert "absolute_path" not in record["observed_value"]
             assert "role_candidates" not in record["observed_value"]
             assert "file_kind" not in record["observed_value"]
+            assert "declared_source" not in record["observed_value"]
+            assert "role" not in record["observed_value"]
 
 
 def test_build_evidence_index_order_and_full_output_are_deterministic():
@@ -156,6 +190,7 @@ def test_render_evidence_index_markdown_summarizes_records_and_scope_notes():
 
     assert "# Evidence Index" in markdown
     assert "- csv_structure: 1" in markdown
+    assert "- document_chunk: 2" in markdown
     assert "## train.csv" in markdown
     assert "### csv_structure" in markdown
     assert "role_candidates는 Evidence로 승격하지 않음" in markdown

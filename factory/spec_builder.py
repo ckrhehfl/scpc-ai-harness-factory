@@ -11,6 +11,8 @@ SUPPORTED_OVERRIDE_PATHS = {
     "rules.external_data_allowed",
     "rules.pretrained_model_allowed",
     "rules.internet_allowed",
+    "rules.allowed_language",
+    "rules.manual_labeling_allowed",
     "problem.evaluation_metric",
     "problem.task_type",
     "output.value_constraints",
@@ -217,7 +219,7 @@ def build_contest_spec(contest_path: str | Path) -> dict[str, Any]:
     default_output_value, default_value_evidence = infer_default_output_value(files["sample_submission"], target_col)
 
     rules_text = (raw.get("rules") or "").lower()
-    allowed_language = "Python" if "python" in rules_text or not rules_text else "unknown"
+    allowed_language = "Python" if "python" in rules_text else "unknown"
 
     spec: dict[str, Any] = {
         "contest": {
@@ -281,10 +283,12 @@ def build_unknowns(spec: dict[str, Any]) -> list[dict[str, str]]:
     unknowns: list[dict[str, str]] = []
     checks = [
         ("problem.evaluation_metric", spec["problem"].get("evaluation_metric"), "평가 지표에 따라 solver와 validation 전략이 달라진다."),
+        ("rules.allowed_language", spec["rules"].get("allowed_language"), "허용 언어가 확인되어야 실행 환경과 제출 코드를 고정할 수 있다."),
         ("rules.external_api_allowed", spec["rules"].get("external_api_allowed"), "외부 LLM API solver를 사용할 수 있는지 결정해야 한다."),
         ("rules.external_data_allowed", spec["rules"].get("external_data_allowed"), "외부 데이터/RAG 사용 가능 여부를 결정해야 한다."),
         ("rules.pretrained_model_allowed", spec["rules"].get("pretrained_model_allowed"), "사용 가능한 모델 범위를 결정해야 한다."),
         ("rules.internet_allowed", spec["rules"].get("internet_allowed"), "런타임 검색/크롤링 가능 여부를 결정해야 한다."),
+        ("rules.manual_labeling_allowed", spec["rules"].get("manual_labeling_allowed"), "수동 라벨링과 사람 개입 범위를 확인해야 한다."),
         ("output.value_constraints", spec["output"].get("value_constraints"), "제출 값 범위 검증이 필요하다."),
     ]
     for item, value, why in checks:

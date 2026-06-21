@@ -6,6 +6,10 @@ import csv
 import json
 
 from factory.utils import read_text_if_exists, write_json, write_text
+from factory.contest_package_manifest import (
+    build_manifest_source_map,
+    load_contest_package_manifest,
+)
 
 
 DOCUMENT_EXTENSIONS = {".md", ".txt", ".rst"}
@@ -154,7 +158,37 @@ def read_document_excerpt(path: Path, *, max_chars: int = 4000) -> dict[str, Any
     }
 
 
-def scan_file(path: Path, root: Path) -> dict[str, Any]:
+def read_document_chunks(path: Path, *, chunk_size: int = 4000) -> list[dict[str, Any]]:
+    text = read_text_if_exists(path)
+    return [
+        {
+            "char_start": start,
+            "char_end": min(start + chunk_size, len(text)),
+            "text": text[start : min(start + chunk_size, len(text))],
+        }
+        for start in range(0, len(text), chunk_size)
+    ]
+
+
+def manifest_kind_warnings(relative_path: str, file_kind: str, declared: dict[str, Any]) -> list[str]:
+    source_kind = declared.get("source_kind")
+    if source_kind in {None, "unknown"}:
+        return []
+    compatible = {
+        "document": {"document", "binary_document"},
+        "image": {"image"},
+        "archive": {"archive"},
+        "data": {"csv", "json", "jsonl"},
+        "config": {"config", "json"},
+    }
+    if file_kind not in compatible.get(str(source_kind), set()):
+        return [
+            f"source_kind {source_kind!r} does not match scanner file_kind {file_kind!r} for {relative_path}"
+        ]
+    return []
+
+
+def scan_file(path: Path, root: Path, source_map: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
     relative_path = path.relative_to(root).as_posix()
     suffix = path.suffix.lower()
     file_kind = infer_file_kind(path)
@@ -168,6 +202,11 @@ def scan_file(path: Path, root: Path) -> dict[str, Any]:
         "file_kind": file_kind,
         "role_candidates": infer_role_candidates(relative_path, file_kind),
     }
+    if source_map and relative_path in source_map:
+        info["declared_source"] = source_map[relative_path]
+        warnings = manifest_kind_warnings(relative_path, file_kind, source_map[relative_path])
+        if warnings:
+            info["declared_source_warnings"] = warnings
 
     try:
         if file_kind == "csv":
@@ -178,6 +217,7 @@ def scan_file(path: Path, root: Path) -> dict[str, Any]:
             info["jsonl_preview"] = read_jsonl_preview(path)
         elif file_kind == "document":
             info["document_excerpt"] = read_document_excerpt(path)
+            info["document_chunks"] = read_document_chunks(path)
     except UnicodeDecodeError as exc:
         info["preview_error"] = f"text_decode_error: {exc}"
     except (csv.Error, json.JSONDecodeError, OSError) as exc:
@@ -191,7 +231,9 @@ def scan_contest_inputs(contest_path: str | Path) -> dict[str, Any]:
     if not root.exists():
         raise FileNotFoundError(f"Contest folder not found: {root}")
 
-    files = [scan_file(path, root) for path in sorted(root.rglob("*")) if path.is_file()]
+    manifest = load_contest_package_manifest(root)
+    source_map = build_manifest_source_map(manifest)
+    files = [scan_file(path, root, source_map) for path in sorted(root.rglob("*")) if path.is_file()]
     documents = {
         name: read_text_if_exists(root / name)
         for name in ["description.md", "rules.md", "evaluation.md"]
@@ -209,12 +251,14 @@ def scan_contest_inputs(contest_path: str | Path) -> dict[str, Any]:
         "file_count": len(files),
         "files": files,
         "documents": documents,
+        "contest_package_manifest": manifest,
         "summary": {
             "by_kind": by_kind,
             "by_role": by_role,
             "has_description": "description.md" in documents,
             "has_rules": "rules.md" in documents,
             "has_evaluation": "evaluation.md" in documents,
+            "manifest_present": manifest is not None,
         },
     }
 

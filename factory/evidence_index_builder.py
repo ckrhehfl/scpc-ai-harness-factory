@@ -25,6 +25,7 @@ EVIDENCE_TYPES = [
     "json_structure",
     "jsonl_structure",
     "document_excerpt",
+    "document_chunk",
     "preview_error",
 ]
 
@@ -79,7 +80,7 @@ def render_evidence_index_markdown(index: dict[str, Any]) -> str:
     validate_evidence_index(index)
     counts = {evidence_type: 0 for evidence_type in EVIDENCE_TYPES}
     for record in index["records"]:
-        evidence_type = record["key"].rsplit(":", 1)[-1]
+        evidence_type = _evidence_type_from_key(record)
         counts[evidence_type] = counts.get(evidence_type, 0) + 1
 
     lines = [
@@ -113,7 +114,7 @@ def render_evidence_index_markdown(index: dict[str, Any]) -> str:
         if record["source_file"] != current_file:
             current_file = record["source_file"]
             lines.extend(["", f"## {current_file}", ""])
-        evidence_type = record["key"].rsplit(":", 1)[-1]
+        evidence_type = _evidence_type_from_key(record)
         lines.extend(
             [
                 f"### {evidence_type}",
@@ -262,6 +263,42 @@ def _records_for_file(file_info: dict[str, Any]) -> list[dict[str, Any]]:
             )
         )
 
+    document_chunks = file_info.get("document_chunks")
+    if document_chunks is not None:
+        if not isinstance(document_chunks, list):
+            raise EvidenceModelError(f"document_chunks must be a list for {source_file}")
+        for chunk in document_chunks:
+            if not isinstance(chunk, dict):
+                raise EvidenceModelError(f"document_chunks items must be objects for {source_file}")
+            chunk_values = _require_fields(
+                chunk,
+                ["char_start", "char_end", "text"],
+                f"{source_file}.document_chunks",
+            )
+            char_start = chunk_values["char_start"]
+            char_end = chunk_values["char_end"]
+            text = chunk_values["text"]
+            if not isinstance(char_start, int) or not isinstance(char_end, int):
+                raise EvidenceModelError(f"document chunk char range must be integers for {source_file}")
+            if char_start < 0 or char_end < char_start:
+                raise EvidenceModelError(f"document chunk char range is invalid for {source_file}")
+            if not isinstance(text, str):
+                raise EvidenceModelError(f"document chunk text must be a string for {source_file}")
+            records.append(
+                _build_record(
+                    source_file=source_file,
+                    evidence_type=f"document_chunk:{char_start}:{char_end}",
+                    location={
+                        "path": source_file,
+                        "scope": "document_chunk",
+                        "char_start": char_start,
+                        "char_end": char_end,
+                    },
+                    extraction_method="input_scanner.read_document_chunks",
+                    observed_value={"text": text},
+                )
+            )
+
     preview_error = file_info.get("preview_error")
     if preview_error is not None:
         if not isinstance(preview_error, str):
@@ -307,6 +344,19 @@ def _build_record(
     }
     record["evidence_id"] = build_evidence_id(record)
     return record
+
+
+def _evidence_type_from_key(record: dict[str, Any]) -> str:
+    source_file = record.get("source_file")
+    key = record.get("key")
+    if isinstance(source_file, str) and isinstance(key, str):
+        prefix = f"file:{source_file}:"
+        if key.startswith(prefix):
+            suffix = key[len(prefix) :]
+            if suffix.startswith("document_chunk:"):
+                return "document_chunk"
+            return suffix.split(":", 1)[0]
+    return str(key).rsplit(":", 1)[-1]
 
 
 def _render_observed_value(record: dict[str, Any]) -> str:

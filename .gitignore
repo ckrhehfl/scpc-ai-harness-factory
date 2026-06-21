@@ -6,5 +6,6 @@ __pycache__/
 .ruff_cache/
 generated/
 runs/
+/contests/
 .env
 .DS_Store
