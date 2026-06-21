@@ -16,6 +16,8 @@ from factory.harness_generator import generate_harness
 from factory.experiment_manager import save_run_log
 from factory.report_writer import write_solution_log_stub
 from factory.rule_guard import rule_guard_warnings
+from factory.input_scanner import scan_contest_inputs, save_input_scan_report
+from factory.ai_problem_analyzer import save_ai_problem_analysis_prompt
 from factory.utils import ensure_dir
 
 
@@ -26,6 +28,9 @@ def main() -> int:
     args = parser.parse_args()
 
     output_dir = ensure_dir(args.output)
+
+    input_scan = scan_contest_inputs(args.contest)
+    input_scan_json, input_scan_md = save_input_scan_report(input_scan, output_dir)
 
     spec = build_contest_spec(args.contest)
     spec_yaml, spec_json = save_contest_spec(spec, output_dir)
@@ -40,6 +45,15 @@ def main() -> int:
     )
     blueprint_yaml, blueprint_md = save_harness_blueprint(blueprint, output_dir)
 
+    ai_prompt_path = save_ai_problem_analysis_prompt(
+        input_scan,
+        spec,
+        gap_report,
+        blueprint,
+        output_dir,
+        template_path=PROJECT_ROOT / "templates" / "prompts" / "problem_analyzer.md",
+    )
+
     harness_dir = generate_harness(
         spec,
         blueprint=blueprint,
@@ -51,6 +65,9 @@ def main() -> int:
     run_dir = save_run_log(spec, gap_path, harness_dir)
 
     print("[OK] Factory generated MVP artifacts")
+    print(f"- Input scan report JSON: {input_scan_json}")
+    print(f"- Input scan report MD: {input_scan_md}")
+    print(f"- AI problem analysis prompt: {ai_prompt_path}")
     print(f"- Contest spec: {spec_yaml}")
     print(f"- Contest spec JSON: {spec_json}")
     print(f"- Gap report: {gap_path}")
