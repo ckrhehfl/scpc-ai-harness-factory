@@ -87,7 +87,30 @@ configs/default.json
 `test.csv`의 row count/id 목록, 필수 컬럼, 빈 id/target, 중복 id, `allowed_labels` 제약을 검사한다.
 검증 결과는 `outputs/validation_report.json`과 사람이 읽기 쉬운 `outputs/validation_report.md`로 저장된다.
 
-### 7. `factory/experiment_manager.py`
+### 7. `factory/ai_problem_analyzer.py`
+
+입력 스캔 결과, 현재 `ContestSpec`, `GapReport`, `HarnessBlueprint` 요약을 바탕으로 사람이 외부 AI 도구에
+붙여넣을 프롬프트를 생성한다. 이 단계는 offline-only이며 LLM API를 호출하지 않는다.
+
+### 8. `factory/ai_analysis_intake.py`
+
+사람이 저장한 AI 응답 Markdown에서 `## Machine-readable Analysis Payload` heading 뒤의 첫 `json` fenced code block만
+표준 라이브러리 `json`으로 파싱한다. 필수 필드와 override 후보를 검증하고, 지원되지 않는 path, 낮은 confidence,
+`unknown` 값, 중복 path, 기존 `contest_overrides.yaml`과 충돌하는 값은 실제 proposed override에서 제외한다.
+실제 `contest_overrides.yaml`, `ContestSpec`, `HarnessBlueprint`는 수정하지 않는다.
+
+### 9. `factory/run_ai_analysis_review.py`
+
+AI 응답 intake를 독립 실행하는 CLI다. `factory/run_factory.py` 흐름에 결합하지 않고 다음 검토 산출물만 생성한다.
+
+```text
+generated/ai_analysis_candidates.json
+generated/ai_analysis_review.md
+generated/contest_overrides.proposed.yaml
+generated/code_agent_task_plan.md
+```
+
+### 10. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.
 
