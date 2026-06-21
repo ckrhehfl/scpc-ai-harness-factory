@@ -110,7 +110,28 @@ generated/contest_overrides.proposed.yaml
 generated/code_agent_task_plan.md
 ```
 
-### 10. `factory/experiment_manager.py`
+### 10. `factory/code_agent_prompt_builder.py`
+
+v0.7 후보 JSON과 현재 factory 산출물을 읽어 `Code Agent Work Package`를 만든다.
+입력은 CLI 인자와 output 디렉터리의 고정 산출물로 제한하며, AI 응답에 포함된 임의 경로나 명령은 실행하지 않는다.
+task file 후보는 안전하지 않은 절대 경로, `..`, `.git/`, `generated/`, `runs/`, `.venv/`, secret/env 경로를
+allowed 목록에서 제외하고 warning으로 남긴다.
+
+생성 산출물:
+
+```text
+generated/code_agent_implementation_prompt.md
+generated/code_agent_context.json
+```
+
+이 단계는 offline-only이며 Codex, shell command, git, LLM API, source 수정 기능을 자동 실행하지 않는다.
+
+### 11. `factory/run_code_agent_prompt.py`
+
+Code Agent Work Package를 독립 실행하는 CLI다. `factory/run_factory.py`나
+`factory/run_ai_analysis_review.py` 흐름에 강제로 결합하지 않는다.
+
+### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.
 

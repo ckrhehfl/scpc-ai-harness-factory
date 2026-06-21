@@ -128,6 +128,10 @@ v0.7 AI Analysis Result Intake + Human Review Pack 단계는 사람이 저장한
 `ContestSpec`, `HarnessBlueprint`는 자동 수정하지 않고, 검토용 산출물과
 `generated/contest_overrides.proposed.yaml`만 생성합니다.
 
+v0.8 Code Agent Work Package 단계는 v0.7의 후보 JSON과 현재 factory 산출물을 모아 사람이 Codex에 직접
+붙여넣을 수 있는 구현 프롬프트를 생성합니다. Codex, shell command, git, LLM API를 자동 실행하지 않고,
+실제 source나 `contest_overrides.yaml`도 수정하지 않습니다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text
@@ -194,6 +198,29 @@ generated/code_agent_task_plan.md
 
 `contest_overrides.proposed.yaml`은 실제 contest 폴더가 아니라 output 디렉터리에만 생성됩니다.
 승인된 항목만 사람이 contest 폴더의 `contest_overrides.yaml`에 직접 반영해야 합니다.
+
+### Code Agent 구현 프롬프트 생성
+
+v0.7 review 산출물이 준비된 뒤 별도 CLI를 실행합니다.
+
+```bash
+python factory/run_code_agent_prompt.py \
+  --contest examples/mock_contest_02 \
+  --analysis-candidates generated/ai_analysis_candidates.json \
+  --output generated
+```
+
+생성되는 파일은 사람이 Codex에 전달하기 위한 offline work package입니다.
+
+```text
+generated/code_agent_implementation_prompt.md
+generated/code_agent_context.json
+```
+
+이 단계는 `generated/contest_spec.json`, `generated/gap_report.md`,
+`generated/harness_blueprint.md`, `generated/code_agent_task_plan.md`를 읽고,
+있으면 `generated/ai_analysis_review.md`도 포함합니다. 필수 파일이나 JSON이 잘못된 경우 non-zero로 실패하며
+부분적인 최종 prompt 파일을 만들지 않습니다.
 
 ### `contest_overrides.yaml`
 
