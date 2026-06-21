@@ -132,6 +132,10 @@ v0.8 Code Agent Work Package 단계는 v0.7의 후보 JSON과 현재 factory 산
 붙여넣을 수 있는 구현 프롬프트를 생성합니다. Codex, shell command, git, LLM API를 자동 실행하지 않고,
 실제 source나 `contest_overrides.yaml`도 수정하지 않습니다.
 
+v0.9A Evidence Contract + Evidence Index 단계는 기존 Input Scanner 산출물인
+`generated/input_scan_report.json`을 읽어 기계적으로 관찰된 사실만 공통 Evidence Record로 정규화합니다.
+Decision Ledger, AI 추론, 사람 결정은 아직 포함하지 않으며, `factory/run_factory.py` 흐름에도 자동 결합하지 않습니다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text
@@ -221,6 +225,32 @@ generated/code_agent_context.json
 `generated/harness_blueprint.md`, `generated/code_agent_task_plan.md`를 읽고,
 있으면 `generated/ai_analysis_review.md`도 포함합니다. 필수 파일이나 JSON이 잘못된 경우 non-zero로 실패하며
 부분적인 최종 prompt 파일을 만들지 않습니다.
+
+### Evidence Index 생성
+
+v0.9A Evidence Index는 `run_factory.py`가 만든 `generated/input_scan_report.json`을 입력으로 사용하는
+독립 CLI입니다.
+
+```bash
+python factory/run_evidence_index.py \
+  --input-scan generated/input_scan_report.json \
+  --output generated
+```
+
+생성 산출물은 검토용 projection입니다.
+
+```text
+generated/evidence_index.json
+generated/evidence_index.md
+```
+
+Evidence Index에는 파일 inventory, CSV/JSON/JSONL preview 구조, 문서 excerpt, preview error처럼
+scanner가 결정적으로 관찰한 값만 포함합니다. `absolute_path`, `role_candidates`, `file_kind`는 관찰 사실
+Evidence로 승격하지 않습니다. 이 단계는 `ContestSpec`, `GapReport`, `HarnessBlueprint`,
+`contest_overrides.yaml`, AI analysis candidates, final harness source를 수정하지 않습니다.
+
+향후 Decision Ledger는 Evidence Record의 `evidence_id`를 참조할 수 있지만, Decision Ledger 자체는
+v0.9A 범위에 포함되지 않습니다.
 
 ### `contest_overrides.yaml`
 

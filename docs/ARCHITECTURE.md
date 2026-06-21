@@ -131,6 +131,39 @@ generated/code_agent_context.json
 Code Agent Work Package를 독립 실행하는 CLI다. `factory/run_factory.py`나
 `factory/run_ai_analysis_review.py` 흐름에 강제로 결합하지 않는다.
 
+### 11A. `factory/evidence_model.py`
+
+v0.9A Evidence Record와 Evidence Index의 공통 계약을 검증한다. canonical JSON을 기준으로
+`ev_` + 16자리 lowercase hex 형식의 안정적인 `evidence_id`를 만들고, 필수 필드, 안전한 contest 상대 경로,
+JSON 직렬화 가능성, 중복 ID, deterministic record ordering을 검사한다.
+
+이 모델은 scanner 산출물의 절대 경로, output directory, 생성 시각, 배열 순번, 로컬 머신 경로를 ID 계산에
+포함하지 않는다.
+
+### 11B. `factory/evidence_index_builder.py`
+
+`generated/input_scan_report.json`의 `files` 항목을 읽어 검토용 Evidence Index로 정규화한다.
+모든 파일에는 inventory Evidence를 만들고, 있으면 CSV/JSON/JSONL preview, document excerpt,
+preview error를 별도 Evidence로 만든다.
+
+`absolute_path`, `role_candidates`, `file_kind`는 Evidence observed value로 승격하지 않는다. 이 모듈은
+입력 파싱과 전체 검증이 끝난 뒤에만 `generated/evidence_index.json`과 `generated/evidence_index.md`를
+저장한다.
+
+### 11C. `factory/run_evidence_index.py`
+
+Evidence Index를 독립 실행하는 CLI다.
+
+```bash
+python factory/run_evidence_index.py \
+  --input-scan generated/input_scan_report.json \
+  --output generated
+```
+
+이 단계는 `factory/run_factory.py` 흐름에 자동 결합되지 않는다. `ContestSpec`, `GapReport`,
+`HarnessBlueprint`, `contest_overrides.yaml`, AI analysis candidates, final harness source를 수정하지 않고
+LLM API, shell command, git, subprocess를 실행하지 않는다.
+
 ### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.
