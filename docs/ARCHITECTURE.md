@@ -654,6 +654,112 @@ v0.12는 두 factory capability를 추가한다.
 두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry total은 25이며 checked-in audit에서
 25개 모두 verified/eligible이어야 한다.
 
+### 11AB. `factory/receipt_model.py`
+
+v0.13 Manual Submission Receipt Intake의 공통 계약을 검증한다. Scope는 `local_submission_candidate` 하나로 제한하고,
+receipt ID는 `receipt.local_submission_candidate.rNNN`만 허용한다. `actor`는 `human`만 허용한다.
+
+Receipt status는 `pending`, `recorded`, `retracted`로 제한된다. Platform status는 별도 계층이며 `unknown`, `submitted`,
+`processing`, `accepted`, `scored`, `rejected`, `failed`, `cancelled` 값을 그대로 보존한다. `recorded` receipt는
+platform token, submission identifier, timezone offset이 있는 submitted_at, basename uploaded filename, non-empty
+rationale을 요구한다. `scored`일 때만 score object를 허용하며 score value는 문자열로 보존한다.
+
+Supersession은 append-only history다. 동일 scope의 기존 receipt만 supersede할 수 있고 unknown ID, 자기 자신,
+낮거나 같은 revision, cycle은 structural error다. 복수 unsuperseded leaf는 자동 선택하지 않는다.
+
+Evidence declaration은 `receipt_ev.*` ID와 POSIX relative path만 허용한다. Absolute path, Windows drive path, `..`, `.`,
+empty segment, backslash, NUL은 거부한다.
+
+### 11AC. `factory/post_submission_audit.py`
+
+v0.12 Submission Handoff 뒤의 독립 audit builder다. 입력은 frozen `submission_handoff_manifest.json`,
+`submission_handoff_package.zip`, 사람이 실제 플랫폼에 업로드했다고 주장하는 local preserved `submitted_file`, 선택
+`submission_receipt_intake.json`이다.
+
+이 builder는 다음 상태 계층을 섞지 않는다.
+
+- Handoff status
+- Artifact binding status
+- Receipt record status
+- Platform status
+- Post-submission audit status
+
+Artifact binding은 frozen handoff manifest, archive safety, freeze manifest binding, submitted file byte binding을
+검증한다. Archive는 symlink가 아닌 `.zip` regular file이어야 하고, duplicate filename, directory entry, non-stored entry,
+allowlist mismatch, path traversal을 blocker로 보고한다. Allowlist는 v0.12 package paths 10개로 고정된다.
+
+Manifest candidate entry마다 ZIP entry byte SHA-256과 size를 다시 계산한다. `freeze_manifest.json`은 manifest의
+candidate digest, approval readiness digest, current approval ID, freeze confirmation status/ID, candidate entries와
+일치해야 한다. `submitted_file`은 symlink가 아닌 non-empty `.csv` regular file이어야 하며, 다음 세 값이 정확히 같아야 한다.
+
+```text
+submitted_file SHA-256
+ZIP submission/submission.csv SHA-256
+manifest role=submission entry SHA-256
+```
+
+Receipt state는 leaf receipt 기준으로 `not_provided`, `pending`, `recorded`, `retracted`, `stale`, `conflicting`을 계산한다.
+Leaf의 expected candidate digest 또는 expected submission SHA-256이 현재 input과 다르면 stale이다. Source digest mismatch는
+warning으로 보존한다.
+
+Evidence index는 declared evidence file의 digest와 size만 기록한다. Relative path, base directory, absolute path, OCR text,
+raw evidence content는 output에 포함하지 않는다. Recorded receipt가 evidence를 참조했는데 파일이 missing/symlink/invalid이면
+audit blocker다. Recorded receipt가 evidence를 참조하지 않는 것은 허용하되 warning으로 남긴다.
+
+생성 산출물:
+
+```text
+generated/submission_receipt_template.json
+generated/submission_receipt_evidence_index.json
+generated/post_submission_audit.json
+generated/post_submission_audit.md
+```
+
+`submission_receipt_template.json`은 artifact binding이 matched이고 receipt history가 없으면 r001 pending entry를 제안한다.
+Pending 또는 stale leaf가 있으면 다음 revision으로 supersedes template을 만든다. Recorded/retracted current leaf 또는 conflict는
+자동 template entry를 만들지 않는다.
+
+### 11AD. `factory/run_post_submission_audit.py`
+
+Post-submission audit를 독립 실행하는 CLI다. `factory/run_factory.py`에 통합하지 않는다.
+
+```bash
+python factory/run_post_submission_audit.py \
+  --handoff-manifest generated/submission_handoff_manifest.json \
+  --handoff-archive generated/submission_handoff_package.zip \
+  --submitted-file /private/submission/submission.csv \
+  --receipt-intake /private/submission/submission_receipt_intake.json \
+  --output generated
+```
+
+`--receipt-intake`는 선택이다. Receipt evidence는 intake 파일 parent directory 기준으로 resolve하며 별도 evidence root option을
+두지 않는다.
+
+Output은 임시 directory에서 4개 artifact를 모두 완성한 뒤 교체한다. Structural/IO error에서는 최종 artifact를 부분 생성하지
+않고, 같은 입력에서는 byte-for-byte deterministic해야 한다. 생성 시각과 CLI 절대 경로는 output에 기록하지 않는다.
+
+Exit code:
+
+```text
+0: audit status == complete
+1: structural/IO 오류
+2: artifact 생성, complete가 아님
+```
+
+이 단계는 실제 제출 자동화, 브라우저 로그인, 플랫폼 API 호출, receipt 자동 다운로드, screenshot OCR, receipt 자연어 해석,
+leaderboard 조회, solver 성능 평가, 전자서명/신원 인증을 수행하지 않는다. Audit complete는 local byte와 manually declared
+receipt metadata binding만 의미하며 official acceptance, score validity, compliance, final rank를 보장하지 않는다.
+
+### 11AE. `capabilities/registry.json` v0.13 records
+
+v0.13은 두 factory capability를 추가한다.
+
+- `cap.factory.submission_receipt_validation`
+- `cap.factory.post_submission_audit_generation`
+
+두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry total은 27이며 checked-in audit에서
+27개 모두 verified/eligible이어야 한다.
+
 ### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.

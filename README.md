@@ -467,6 +467,77 @@ Exit code:
 - `1`: structural 또는 IO 오류, 최종 산출물 미생성
 - `2`: artifact 생성, handoff status가 `frozen`이 아님
 
+v0.13 Manual Submission Receipt Intake + Post-Submission Audit 단계는 frozen handoff candidate가 사람이 실제
+플랫폼에 수동 제출된 뒤, 제출 사실과 receipt metadata를 append-only intake로 기록하고 현재 frozen package에 다시
+결합한다. 이 단계는 온라인 제출을 수행하지 않으며 Dacon/SCPC 로그인, 브라우저 자동화, submit API 호출, 파일 업로드,
+OCR, screenshot 내용 판독, receipt 자연어 추론, solver 실행/학습을 수행하지 않는다.
+
+`frozen`과 `submitted`는 다르다. `frozen`은 local handoff package byte가 Human Freeze Confirmation과 일치한다는 뜻이고,
+`submitted` 계열 platform status는 사람이 입력한 receipt metadata일 뿐이다. Post-submission audit는 실제 제출 보존본
+`submitted_file`의 byte가 package 안의 `submission/submission.csv` 및 manifest submission entry SHA-256/size와 정확히
+일치하는지 확인한다. Platform status가 `accepted`, `scored`, `rejected` 중 무엇이든 byte binding mismatch는 audit
+`blocked`다.
+
+Receipt intake 최상위 형식:
+
+```json
+{
+  "schema_version": "v0.13",
+  "artifact_type": "submission_receipt_intake",
+  "scope": "local_submission_candidate",
+  "source_digests": {
+    "handoff_manifest": "sha256:...",
+    "handoff_archive": "sha256:..."
+  },
+  "candidate_digest": "sha256:...",
+  "submission_sha256": "sha256:...",
+  "evidence_files": [],
+  "receipts": [],
+  "notes": []
+}
+```
+
+Receipt status와 platform status는 분리된다. Receipt status는 `pending`, `recorded`, `retracted`만 허용하고,
+platform status는 `unknown`, `submitted`, `processing`, `accepted`, `scored`, `rejected`, `failed`, `cancelled`를
+그대로 보존한다. `submitted_at`은 timezone offset이 있는 ISO-8601/RFC3339 문자열이어야 하며 현재 시간을 자동 생성하지
+않는다. `scored`일 때만 score object를 허용하고, score value는 float로 변환하지 않는다.
+
+Receipt evidence file은 intake 파일의 parent directory 기준 relative path로만 선언한다. Audit는 evidence file이 symlink가
+아닌 regular file이고 size > 0인지 확인한 뒤 `evidence_id`, filename, media type, description, SHA-256, size만
+`submission_receipt_evidence_index.json`에 기록한다. Raw evidence file은 `generated/`로 복사하지 않고, OCR/semantic
+parsing도 수행하지 않는다.
+
+독립 CLI:
+
+```bash
+python factory/run_post_submission_audit.py \
+  --handoff-manifest generated/submission_handoff_manifest.json \
+  --handoff-archive generated/submission_handoff_package.zip \
+  --submitted-file /private/submission/submission.csv \
+  --receipt-intake /private/submission/submission_receipt_intake.json \
+  --output generated
+```
+
+`--receipt-intake`는 선택이다. Receipt가 없으면 artifact binding은 계속 진행되고 audit status는 `awaiting_receipt`가 된다.
+
+생성 산출물:
+
+```text
+generated/submission_receipt_template.json
+generated/submission_receipt_evidence_index.json
+generated/post_submission_audit.json
+generated/post_submission_audit.md
+```
+
+Exit code:
+
+- `0`: audit status가 `complete`
+- `1`: structural 또는 IO 오류, 최종 산출물 미생성
+- `2`: artifact 생성, audit status가 `complete`가 아님
+
+`complete`는 수동 제출 receipt metadata와 실제 submitted file byte가 현재 frozen handoff candidate에 정확히 결합되었다는
+뜻이다. 플랫폼 합격, 점수 유효성, 규칙 준수, 최종 순위, 법률/IP 적합성을 뜻하지 않는다.
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text

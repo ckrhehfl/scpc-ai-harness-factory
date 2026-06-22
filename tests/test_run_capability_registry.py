@@ -150,9 +150,9 @@ def test_cli_checked_in_registry_succeeds(tmp_path: Path):
     result = run_cli(REPO_ROOT / "capabilities" / "registry.json", REPO_ROOT, output)
     assert result.returncode == 0
     data = json.loads((output / "capability_registry.json").read_text(encoding="utf-8"))
-    assert data["summary"]["total"] == 25
-    assert data["summary"]["verified"] == 25
-    assert data["summary"]["eligible"] == 25
+    assert data["summary"]["total"] == 27
+    assert data["summary"]["verified"] == 27
+    assert data["summary"]["eligible"] == 27
     assert data["summary"]["incomplete"] == 0
     ids = {item["capability_id"] for item in data["capabilities"]}
     assert "cap.factory.contest_requirement_generation" in ids
@@ -163,3 +163,5 @@ def test_cli_checked_in_registry_succeeds(tmp_path: Path):
     assert "cap.factory.local_readiness_gate_generation" in ids
     assert "cap.factory.freeze_confirmation_validation" in ids
     assert "cap.factory.submission_handoff_package_generation" in ids
+    assert "cap.factory.submission_receipt_validation" in ids
+    assert "cap.factory.post_submission_audit_generation" in ids

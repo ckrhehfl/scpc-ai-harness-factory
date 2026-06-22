@@ -1346,6 +1346,148 @@
       ]
     },
     {
+      "capability_id": "cap.factory.submission_receipt_validation",
+      "name": "Manual submission receipt validation",
+      "scope": "factory",
+      "category": "audit",
+      "declared_status": "implemented",
+      "description": "Validates append-only manual submission receipt intake, supersession chains, platform metadata, stale digest binding, and receipt evidence declarations.",
+      "provides": [
+        "submission.receipt.validate",
+        "submission.receipt.supersession.validate",
+        "submission.receipt.evidence.hash",
+        "submission.receipt.drift.detect"
+      ],
+      "inputs": [
+        "submission_receipt_intake.json",
+        "receipt evidence files"
+      ],
+      "outputs": [
+        "submission_receipt_evidence_index.json",
+        "receipt_state"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/receipt_model.py",
+          "symbols": [
+            "validate_submission_receipt_intake",
+            "validate_submission_receipt_entry",
+            "validate_receipt_evidence_declaration"
+          ]
+        },
+        {
+          "path": "factory/post_submission_audit.py",
+          "symbols": [
+            "build_receipt_evidence_index"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_receipt_model.py",
+          "symbols": [
+            "test_valid_pending_recorded_retracted_entries",
+            "test_intake_rejects_duplicate_unknown_self_lower_supersession_and_cycle",
+            "test_evidence_declaration_path_safety_and_reference_validation"
+          ]
+        },
+        {
+          "path": "tests/test_post_submission_audit.py",
+          "symbols": [
+            "test_receipt_states_platform_outcomes_and_templates",
+            "test_evidence_index_hash_only_no_paths_or_raw_contents_and_missing_blocks"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.submission_handoff_package_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Receipt metadata and human identity are manually declared and are not independently authenticated.",
+        "Receipt evidence files are hashed but not text-extracted or semantically interpreted."
+      ],
+      "tags": [
+        "offline",
+        "human_review",
+        "deterministic"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.post_submission_audit_generation",
+      "name": "Post-submission audit generation",
+      "scope": "factory",
+      "category": "audit",
+      "declared_status": "implemented",
+      "description": "Audits a preserved manually submitted file and optional receipt metadata against a frozen local handoff manifest and package archive.",
+      "provides": [
+        "submission.audit.archive.verify",
+        "submission.audit.byte_binding.verify",
+        "submission.audit.receipt.bind",
+        "submission.audit.report"
+      ],
+      "inputs": [
+        "submission_handoff_manifest.json",
+        "submission_handoff_package.zip",
+        "submitted_file",
+        "submission_receipt_intake.json"
+      ],
+      "outputs": [
+        "post_submission_audit.json",
+        "post_submission_audit.md",
+        "submission_receipt_template.json",
+        "submission_receipt_evidence_index.json"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/post_submission_audit.py",
+          "symbols": [
+            "build_post_submission_audit",
+            "build_submission_receipt_template",
+            "render_post_submission_audit_markdown",
+            "save_post_submission_outputs"
+          ]
+        },
+        {
+          "path": "factory/run_post_submission_audit.py",
+          "symbols": [
+            "main"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_post_submission_audit.py",
+          "symbols": [
+            "test_frozen_manifest_valid_archive_matching_submitted_file_is_matched_and_awaits_receipt",
+            "test_zip_safety_and_freeze_manifest_binding_blockers",
+            "test_save_outputs_deterministic_markdown_and_no_absolute_paths"
+          ]
+        },
+        {
+          "path": "tests/test_run_post_submission_audit.py",
+          "symbols": [
+            "test_cli_recorded_receipt_exit_0_and_rejected_outcome_still_complete",
+            "test_cli_deterministic_rerun_no_absolute_paths_or_timestamps"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.submission_receipt_validation",
+        "cap.factory.submission_handoff_package_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Audit completion proves local byte and receipt metadata binding only.",
+        "It does not query the competition platform or prove official acceptance, score validity, or compliance."
+      ],
+      "tags": [
+        "offline",
+        "audit",
+        "deterministic"
+      ]
+    },
+    {
       "capability_id": "cap.generated_harness.submission_verification",
       "name": "Generated harness submission verification",
       "scope": "generated_harness",
