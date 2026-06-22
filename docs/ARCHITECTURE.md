@@ -440,6 +440,100 @@ v0.11A는 두 factory capability를 추가한다.
 두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry는 Decision Ledger 기능을
 선언하지만 Human Approval Summary나 최종 go/no-go 판정 capability는 포함하지 않는다.
 
+### 11T. `factory/approval_model.py`
+
+v0.11B Human Approval Intake와 Human Approval Summary의 공통 계약을 검증한다. 승인 범위는
+`local_submission_candidate` 하나로 제한하고, approval entry ID는
+`approval.local_submission_candidate.rNNN` 형식만 허용한다.
+
+Human Approval actor는 `human`만 허용한다. `pending`, `approved`, `rejected`, `conditional` 상태를 구분하며,
+`approved`와 `rejected`는 non-empty rationale과 빈 conditions를 요구한다. 조건이 있는 approval은
+`conditional`이어야 하며 approval granted가 아니다.
+
+Supersession은 append-only history다. 동일 scope의 기존 approval만 supersede할 수 있고, unknown ID, 자기 자신,
+낮거나 같은 revision, cycle은 structural error다. 복수 unsuperseded leaf는 자동 선택하지 않고 conflict 상태로 남긴다.
+
+`build_readiness_digest`는 기존 `factory.decision_model.canonical_json_digest`를 재사용한다. Digest input은 현재
+source artifact digest, machine readiness checks 전체, validation report 존재 여부 및 정규화된 validation 상태다.
+Human approval history 자체는 readiness digest에 포함하지 않는다.
+
+### 11U. `factory/human_approval_builder.py`
+
+Decision Ledger 뒤의 독립 Local Readiness Gate builder다. 입력은 `contest_requirements.json`,
+`requirement_capability_match.json`, `decision_ledger.json`, `capability_registry.json`, 선택 `validation_report.json`,
+선택 `human_approval_intake.json`이다.
+
+이 builder는 다음 상태를 섞지 않는다.
+
+- Requirement 상태
+- Capability Match 상태
+- Decision Ledger 상태
+- Machine Readiness 상태
+- Human Approval 상태
+- Overall Gate 상태
+
+Machine Readiness checks는 active must gap, unresolved/stale/conflicting/follow-up decision, Ledger source/subject drift,
+required capability health, validation report presence/pass/warnings를 계산한다. active must gap은 Human Approval이나
+Decision으로 우회할 수 없다. confirmed `implement_missing_capability`, `confirm_value`, `wait_for_information`은
+follow-up blocker로 남는다.
+
+Required capability health는 active must satisfied match의 matched/dependency capability와 authoritative
+`use_existing_capability` decision의 selected capability만 검사한다. 관련 없는 planned/ineligible capability는 전체 gate를
+막지 않는다.
+
+Validation Report는 구조와 count 일관성을 검증하지만 summary에는 `present`, `passed`, count, 실패 check name만 복사한다.
+message/details/path 계열 값은 절대 경로를 포함할 수 있으므로 Human Approval Summary로 복사하지 않는다.
+
+생성 산출물:
+
+```text
+generated/human_approval_intake_template.json
+generated/human_approval_summary.json
+generated/human_approval_summary.md
+```
+
+Machine readiness가 blocked이면 approval template에는 entry를 만들지 않는다. Reviewable이고 approval history가 없으면
+`approval.local_submission_candidate.r001` pending entry를 만든다. pending/stale/conditional leaf가 있으면 다음 revision과
+`supersedes`를 설정한다. current approved/rejected leaf 또는 conflict는 자동으로 새 entry를 만들지 않는다.
+
+### 11V. `factory/run_human_approval.py`
+
+Human Approval Summary를 독립 실행하는 CLI다.
+
+```bash
+python factory/run_human_approval.py \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --decision-ledger generated/decision_ledger.json \
+  --capabilities generated/capability_registry.json \
+  --validation-report generated/final_harness/outputs/validation_report.json \
+  --approval-intake /private/path/human_approval_intake.json \
+  --output generated
+```
+
+Exit code:
+
+```text
+0: 산출물 생성, Overall Gate == approved
+1: structural/IO 오류, 최종 산출물 미생성
+2: 산출물 생성, Overall Gate != approved
+```
+
+Exit 0은 local readiness approval일 뿐이며 공식 제출 허용, solver 성능, 리더보드 점수, 법률/IP 검토, 온라인 제출 성공을
+뜻하지 않는다. 이 단계는 `factory/run_factory.py`에 통합하지 않고, ContestSpec, Requirement, Match, Decision Ledger,
+Capability Registry, `contest_overrides.yaml`, final harness source, private contest package를 수정하지 않는다.
+
+### 11W. `capabilities/registry.json` v0.11B records
+
+v0.11B는 두 factory capability를 추가한다.
+
+- `cap.factory.human_approval_intake_validation`
+- `cap.factory.local_readiness_gate_generation`
+
+두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry는 local readiness gate 기능을
+선언하지만 official contest acceptance, Human identity authentication, solver quality, legal/IP review, online submission
+success를 증명하지 않는다.
+
 ### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.

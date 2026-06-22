@@ -312,6 +312,89 @@ Exit code:
 `follow_up_required_count > 0`만으로 exit 2가 되지는 않습니다. Exit 0은 Decision Ledger disposition이
 완전하다는 뜻일 뿐, 구현 완료, Human Approval, solver 성능 또는 최종 제출 준비 완료를 뜻하지 않습니다.
 
+v0.11B Human Approval Summary + Local Readiness Gate 단계는 Contest Requirement, Requirement-Capability Match,
+Decision Ledger, Capability Registry, 선택 `validation_report.json`, 선택 `human_approval_intake.json`을 결합해
+현재 저장된 로컬 제출 후보의 기계적 blocker와 명시적 Human Approval 상태를 분리해서 보고합니다.
+
+승인 범위는 오직 `local_submission_candidate`입니다. `approved`는 현재 로컬 artifact가 구성된 readiness checks를
+통과했고 현재 readiness digest에 대한 명시적 human approval이 있다는 뜻입니다. 공식 대회 규칙 확인, 공식 제출 허용,
+리더보드 점수, solver 성능, 법률/IP 검토, 최종 온라인 제출 성공을 뜻하지 않습니다.
+
+Machine Readiness와 Human Approval은 분리됩니다.
+
+- active must capability gap은 Human Approval이나 `accept_risk`, `waive_requirement`, `reject_requirement` decision으로 우회할 수 없습니다.
+- Decision이 `confirmed`여도 `implement_missing_capability`, `confirm_value`, `wait_for_information` 후속 작업이 남으면 readiness blocker입니다.
+- Validation Report pass는 제출 파일 구조 검증일 뿐이며 solver gap이나 accuracy를 덮어쓰지 않습니다.
+- Human Approval은 machine readiness blocker를 덮어쓰지 않습니다.
+
+Human Approval Intake 최상위 형식:
+
+```json
+{
+  "schema_version": "v0.11B",
+  "artifact_type": "human_approval_intake",
+  "source_digests": {
+    "contest_requirements": "sha256:...",
+    "requirement_capability_match": "sha256:...",
+    "decision_ledger": "sha256:...",
+    "capability_registry": "sha256:...",
+    "validation_report": null
+  },
+  "readiness_digest": "sha256:...",
+  "approvals": [],
+  "notes": []
+}
+```
+
+Approval entry는 `approval.local_submission_candidate.rNNN` 형식이고 `actor`는 `human`만 허용합니다.
+`approval_status`는 `pending`, `approved`, `rejected`, `conditional`입니다. `approved`와 `rejected`는 non-empty
+rationale과 빈 conditions가 필요하고, `conditional`은 non-empty rationale과 최소 1개 condition이 필요합니다.
+조건이 붙은 approved는 허용하지 않습니다.
+
+Readiness digest는 현재 input artifact digest, machine readiness checks 전체, validation report 존재 여부 및 정규화된
+validation 상태를 canonical JSON digest로 계산합니다. Human approval history 자체는 digest에 포함하지 않고,
+approval entry의 `expected_readiness_digest`가 현재 digest와 다르면 stale approval입니다.
+
+Overall Gate 상태는 다음 중 하나입니다.
+
+- `blocked`: machine readiness blocker 존재
+- `awaiting_human_approval`: reviewable이지만 current approval 없음
+- `approved`: reviewable이고 current approved approval 존재
+- `rejected`: current rejected approval 존재
+- `conditional_approval`: current conditional approval 존재
+- `stale_approval`: current approval leaf의 readiness digest가 stale
+- `conflicting_approval`: 복수 unsuperseded approval leaf 존재
+
+독립 CLI:
+
+```bash
+python factory/run_human_approval.py \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --decision-ledger generated/decision_ledger.json \
+  --capabilities generated/capability_registry.json \
+  --validation-report generated/final_harness/outputs/validation_report.json \
+  --approval-intake /private/path/human_approval_intake.json \
+  --output generated
+```
+
+`--validation-report`와 `--approval-intake`는 선택입니다. Local readiness approval에는 validation report가 필요하므로
+누락되면 blocker가 됩니다. Output artifact에는 CLI의 절대 입력 경로, 사용자명, WSL mount path, 생성 시각을 기록하지 않습니다.
+
+생성 산출물:
+
+```text
+generated/human_approval_intake_template.json
+generated/human_approval_summary.json
+generated/human_approval_summary.md
+```
+
+Exit code:
+
+- `0`: 산출물 생성, Overall Gate가 `approved`
+- `1`: structural 또는 IO 오류, 최종 산출물 미생성
+- `2`: 산출물 생성, Overall Gate가 `approved`가 아님
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text

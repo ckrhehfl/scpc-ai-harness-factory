@@ -1028,6 +1028,138 @@
       ]
     },
     {
+      "capability_id": "cap.factory.human_approval_intake_validation",
+      "name": "Human Approval Intake validation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Validates local submission candidate approval entries, supersession history, current readiness digest drift, and gate check records.",
+      "provides": [
+        "human.approval.intake.validate",
+        "human.approval.supersession.validate",
+        "human.approval.drift.detect"
+      ],
+      "inputs": [
+        "human_approval_intake",
+        "readiness_digest"
+      ],
+      "outputs": [
+        "validated_human_approval_intake",
+        "human_approval_calculated_state"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/approval_model.py",
+          "symbols": [
+            "validate_approval_entry",
+            "validate_approval_intake",
+            "validate_gate_check",
+            "build_readiness_digest"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_approval_model.py",
+          "symbols": [
+            "test_valid_approval_status_shapes",
+            "test_invalid_approval_entries_are_rejected",
+            "test_supersession_validation_duplicate_unknown_self_revision_and_cycle",
+            "test_readiness_digest_is_deterministic_order_independent_and_changes_with_checks"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.decision_ledger_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Human actor identity is declared but not cryptographically authenticated.",
+        "Approval rationale and authority are not independently verified."
+      ],
+      "tags": [
+        "offline",
+        "human_review"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.local_readiness_gate_generation",
+      "name": "Local Readiness Gate generation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Builds deterministic local readiness, human approval, and overall gate summaries for a local submission candidate.",
+      "provides": [
+        "local.readiness.evaluate",
+        "human.approval.summary.build",
+        "human.approval.template.generate"
+      ],
+      "inputs": [
+        "contest_requirements",
+        "requirement_capability_match",
+        "decision_ledger",
+        "capability_registry",
+        "validation_report",
+        "human_approval_intake"
+      ],
+      "outputs": [
+        "human_approval_summary.json",
+        "human_approval_summary.md",
+        "human_approval_intake_template.json"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/human_approval_builder.py",
+          "symbols": [
+            "build_human_approval_summary",
+            "build_human_approval_intake_template",
+            "render_human_approval_summary_markdown",
+            "save_human_approval_outputs"
+          ]
+        },
+        {
+          "path": "factory/run_human_approval.py",
+          "symbols": [
+            "main"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_human_approval_builder.py",
+          "symbols": [
+            "test_active_must_gap_and_accept_risk_do_not_become_ready",
+            "test_overall_gate_approval_states_and_blocker_override",
+            "test_template_generation_rules_and_markdown_caveats"
+          ]
+        },
+        {
+          "path": "tests/test_run_human_approval.py",
+          "symbols": [
+            "test_blocked_reviewable_and_approval_exit_codes",
+            "test_stale_conflicting_and_missing_validation_exit_2",
+            "test_deterministic_rerun_sources_unchanged_and_no_absolute_input_paths"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.human_approval_intake_validation",
+        "cap.factory.requirement_capability_matching",
+        "cap.factory.decision_ledger_generation",
+        "cap.generated_harness.validation_report_emission"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "The gate evaluates configured local artifacts only and does not verify official contest acceptance.",
+        "An approved gate does not prove solver quality, legal compliance, or successful online submission."
+      ],
+      "tags": [
+        "offline",
+        "human_review",
+        "deterministic"
+      ]
+    },
+    {
       "capability_id": "cap.generated_harness.submission_csv_writing",
       "name": "Generated harness submission CSV writing",
       "scope": "generated_harness",
