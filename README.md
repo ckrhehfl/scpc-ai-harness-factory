@@ -163,7 +163,7 @@ generated/capability_registry.md
 
 Capability Registry와 Contest Requirement는 다릅니다. Capability Registry는 "공장이 현재 무엇을 할 수
 있고 그 코드/테스트 근거가 저장소에 있는가"를 선언하고 감사합니다. Contest Requirement는 특정 대회가
-요구하거나 금지하는 조건입니다. Requirement Matcher는 아직 구현하지 않았습니다.
+요구하거나 금지하는 조건입니다.
 
 상태 의미:
 
@@ -225,6 +225,92 @@ Exit code:
 - `0`: 산출물 생성, active must gap 없음
 - `1`: structural 또는 IO 오류, 최종 산출물 미생성
 - `2`: 산출물 생성, active must gap 존재
+
+v0.11A Decision Ledger 단계는 v0.10B의 Contest Requirement 및 Requirement-Capability Match 결과에서
+사람의 판단이 필요한 항목을 결정적으로 식별하고, 선택 입력인 `decision_intake.json`을 검증해 append-only
+Decision Ledger를 생성합니다. 이 단계는 `factory/run_factory.py` 흐름에 자동 결합되지 않으며
+`contest_overrides.yaml`, ContestSpec, Requirement, Match 결과, Capability Registry, solver source를 수정하지 않습니다.
+
+Decision Intake 최상위 형식:
+
+```json
+{
+  "schema_version": "v0.11A",
+  "artifact_type": "decision_intake",
+  "source_digests": {
+    "contest_requirements": "sha256:...",
+    "requirement_capability_match": "sha256:...",
+    "capability_registry": "sha256:..."
+  },
+  "decisions": [],
+  "notes": []
+}
+```
+
+Decision entry는 `dec.<requirement-stem>.rNNN` 형식의 `decision_id`, `requirement_id`,
+`expected_subject_digest`, `actor`, `decision_status`, `action`, 선택 evidence/condition/supersedes 정보를 담습니다.
+`actor`는 intake에서 `human` 또는 `ai`만 허용하며, `deterministic`은 intake가 없는 required/not-required ledger
+상태를 만들 때만 사용합니다. `ai`는 `proposed`만 가능하고, `human`은 `pending`, `confirmed`, `rejected`만
+가능합니다. `confirmed`와 `rejected`는 human만 사용할 수 있습니다.
+
+`action`은 `no_action`, `use_existing_capability`, `implement_missing_capability`, `confirm_value`, `accept_risk`,
+`wait_for_information`, `waive_requirement`, `reject_requirement` 중 하나입니다. `pending`은 항상 `no_action`이며,
+`confirm_value`는 non-empty known value를 기록만 합니다. confirmed decision도 ContestSpec이나
+`contest_overrides.yaml`에 값을 자동 적용하지 않습니다.
+
+Authoritative decision은 다음 조건을 모두 만족할 때만 true입니다.
+
+- `actor == human`
+- `decision_status == confirmed`
+- decision의 subject digest가 현재 requirement/match 전체 record digest와 일치
+- supersession conflict가 없음
+- action semantic validation 통과
+
+subject digest는 현재 requirement record 전체와 동일 `requirement_id`의 match record 전체를 canonical JSON으로
+직렬화한 SHA-256입니다. source artifact digest mismatch는 warning으로 남기지만 전체 결정을 stale로 만들지는 않습니다.
+각 decision의 `expected_subject_digest`가 현재 subject digest와 다르면 해당 current decision은 `stale`입니다.
+
+Supersession은 append-only history입니다. 새 revision은 같은 requirement의 이전 decision을 `supersedes`로 가리킬 수
+있고, 낮거나 같은 revision, 자기 자신, 다른 requirement, cycle은 structural error입니다. 복수 unsuperseded leaf가
+남으면 자동 선택하지 않고 `conflicting`으로 기록합니다.
+
+독립 CLI:
+
+```bash
+python factory/run_decision_ledger.py \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --capabilities generated/capability_registry.json \
+  --output generated
+```
+
+선택 intake:
+
+```bash
+python factory/run_decision_ledger.py \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --capabilities generated/capability_registry.json \
+  --intake /private/path/decision_intake.json \
+  --output generated
+```
+
+생성 산출물:
+
+```text
+generated/decision_intake_template.json
+generated/decision_ledger.json
+generated/decision_ledger.md
+```
+
+Exit code:
+
+- `0`: 산출물 생성, unresolved required/stale/conflicting decision 없음
+- `1`: structural 또는 IO 오류, 최종 산출물 미생성
+- `2`: 산출물 생성, unresolved required 또는 stale/conflicting decision 존재
+
+`follow_up_required_count > 0`만으로 exit 2가 되지는 않습니다. Exit 0은 Decision Ledger disposition이
+완전하다는 뜻일 뿐, 구현 완료, Human Approval, solver 성능 또는 최종 제출 준비 완료를 뜻하지 않습니다.
 
 정상 실행되면 다음 파일들이 생성됩니다.
 

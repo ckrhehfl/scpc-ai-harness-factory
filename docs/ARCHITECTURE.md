@@ -219,8 +219,7 @@ stable `cap.<scope>.<stable_name>` ID로 선언한다. 각 record는 scope, cate
 inputs/outputs, implementation evidence, test evidence, dependencies, risk gates, limitations, tags를 담는다.
 
 이 파일은 Contest Requirement가 아니며, 특정 대회 요구사항과 capability를 자동 매칭하지 않는다.
-외부 API 실행, Dacon crawling/upload, OCR, Decision Ledger, Human Approval Summary, 자동 git/Codex 실행 능력은
-등록하지 않는다.
+외부 API 실행, Dacon crawling/upload, OCR, Human Approval Summary, 자동 git/Codex 실행 능력은 등록하지 않는다.
 
 ### 11I. `factory/capability_model.py`
 
@@ -338,6 +337,108 @@ v0.10B는 두 factory capability를 추가한다.
 
 두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry는 여전히 capability 선언이며
 Contest Requirement 자체나 official rule approval이 아니다.
+
+### 11P. `factory/decision_model.py`
+
+v0.11A Decision Intake와 Decision Ledger의 공통 계약을 검증한다. canonical JSON digest는
+`json.dumps(sort_keys=True, ensure_ascii=False, separators=(",", ":"))` 결과의 UTF-8 SHA-256이며,
+digest 형식은 `sha256:<64 lowercase hex>`다.
+
+subject digest는 현재 requirement record 전체와 동일 `requirement_id`의 match record 전체만으로 계산한다.
+생성 시각, 로컬 경로, 배열 순번은 digest input에 추가하지 않는다.
+
+Decision Intake validator는 다음을 structural contract로 본다.
+
+- `decision_id`: `dec.<requirement-stem>.rNNN`, revision은 001 이상
+- `actor`: `human` 또는 `ai`; `deterministic`은 intake에 허용하지 않음
+- `decision_status`: `pending`, `proposed`, `confirmed`, `rejected`
+- `ai`는 `proposed`만 가능, `human`은 `pending`, `confirmed`, `rejected`만 가능
+- `pending`은 `no_action`, null value, empty selected capabilities
+- `confirmed`/`proposed`/`rejected`는 non-empty rationale과 non-`no_action`
+- `confirm_value`는 null/empty/`unknown`이 아닌 value 필요
+- supersession revision/order/cycle 검사
+
+이 모델은 actor identity 인증이나 rationale의 진실성은 증명하지 않는다.
+
+### 11Q. `factory/decision_ledger_builder.py`
+
+v0.10B 산출물인 `contest_requirements.json`, `requirement_capability_match.json`과 audited
+`capability_registry.json`, 선택 `decision_intake.json`을 결합해 append-only Decision Ledger를 만든다.
+
+Decision 상태는 Requirement 상태 및 Capability Match 상태와 분리된다. 예를 들어 사람이 `wait_for_information`을
+confirmed로 결정해도 Requirement의 `applicability`가 자동으로 confirmed가 되지 않고, match 결과도 바뀌지 않는다.
+
+Decision Required reason code:
+
+- `active_must_gap`: `priority == must`, `applicability == active`, match가 `partial|unmet|blocked`
+- `pending_red`: red risk pending requirement
+- `conflicting_provenance`: provenance가 conflicting
+- `red_not_modeled`: red risk not-modeled requirement
+- `active_red_not_evaluated`: red active requirement인데 match가 not_evaluated
+
+Ledger resolution status는 `not_required`, `pending`, `proposed`, `confirmed`, `rejected`, `stale`, `conflicting`이다.
+복수 current leaf 또는 semantic conflict가 있으면 `conflicting`, current leaf digest가 현재 subject와 다르면 `stale`이다.
+intake가 없고 decision이 필요하면 `pending`, 필요 없으면 `not_required`다.
+
+Authoritative는 human confirmed, current subject digest, supersession conflict 없음, semantic validation 통과일 때만 true다.
+AI proposal과 pending template은 authoritative가 아니다.
+
+`implement_missing_capability`, `confirm_value`, `wait_for_information`은 confirmed decision이어도 후속 구현 또는 공식
+정보 확인이 필요하므로 `follow_up_required`로 계산한다. `use_existing_capability`, `accept_risk`,
+`waive_requirement`, `reject_requirement`는 ledger 상 disposition 완료로 분류하지만 최종 제출 준비 완료를 의미하지 않는다.
+
+생성 산출물:
+
+```text
+generated/decision_intake_template.json
+generated/decision_ledger.json
+generated/decision_ledger.md
+```
+
+Template은 `decision_required == true`이고 `resolution_status != confirmed`인 record만 대상으로 pending entry를 만든다.
+current leaf가 하나 있으면 다음 revision과 `supersedes`를 자동 설정한다. 복수 leaf conflict는 자동 선택하지 않고
+warning만 남긴다.
+
+### 11R. `factory/run_decision_ledger.py`
+
+Decision Ledger를 독립 실행하는 CLI다.
+
+```bash
+python factory/run_decision_ledger.py \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --capabilities generated/capability_registry.json \
+  --intake /private/path/decision_intake.json \
+  --output generated
+```
+
+`--intake`는 선택이다. CLI는 원본 input artifact를 수정하지 않고, output artifact에는 절대 input path나 생성 시각을
+포함하지 않는다.
+
+Exit code:
+
+```text
+0: 산출물 생성, unresolved required/stale/conflicting decision 없음
+1: structural/IO 오류, 최종 산출물 미생성
+2: 산출물 생성, unresolved required 또는 stale/conflicting decision 존재
+```
+
+`follow_up_required_count > 0`만으로 exit 2가 되지는 않는다. Exit 0은 Decision Ledger disposition이 완전하다는 뜻이며,
+Human Approval, solver 성능, 구현 완료, 최종 제출 준비 완료를 뜻하지 않는다.
+
+이 단계는 v0.10B 뒤의 독립 단계이며 `factory/run_factory.py`에 통합하지 않는다. ContestSpec, Requirement,
+Requirement-Capability Match, Capability Registry, `contest_overrides.yaml`, final harness source, private contest package를
+수정하지 않는다.
+
+### 11S. `capabilities/registry.json` v0.11A records
+
+v0.11A는 두 factory capability를 추가한다.
+
+- `cap.factory.decision_intake_validation`
+- `cap.factory.decision_ledger_generation`
+
+두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry는 Decision Ledger 기능을
+선언하지만 Human Approval Summary나 최종 go/no-go 판정 capability는 포함하지 않는다.
 
 ### 12. `factory/experiment_manager.py`
 

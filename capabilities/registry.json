@@ -803,6 +803,138 @@
       ]
     },
     {
+      "capability_id": "cap.factory.decision_intake_validation",
+      "name": "Decision Intake validation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Validates Decision Intake structure, actor/status/action rules, supersession links, and subject drift digests without applying decisions.",
+      "provides": [
+        "decision.intake.validate",
+        "decision.supersession.validate",
+        "decision.subject_drift.detect"
+      ],
+      "inputs": [
+        "decision_intake",
+        "contest_requirements",
+        "requirement_capability_match",
+        "capability_registry"
+      ],
+      "outputs": [
+        "validated_decision_intake",
+        "subject_digest_status"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/decision_model.py",
+          "symbols": [
+            "canonical_json_digest",
+            "build_subject_digest",
+            "validate_decision_entry",
+            "validate_decision_intake",
+            "validate_decision_ledger"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_decision_model.py",
+          "symbols": [
+            "test_canonical_digest_is_deterministic_and_key_order_independent",
+            "test_subject_digest_changes_when_requirement_or_match_changes",
+            "test_pending_template_entry_is_valid",
+            "test_invalid_decision_entries_are_rejected",
+            "test_supersession_root_and_next_revision_are_valid"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_requirement_generation",
+        "cap.factory.requirement_capability_matching"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Decision authorship is represented only by actor type and is not identity-authenticated.",
+        "Validation checks structure, references, supersession, and drift; it does not prove rationale correctness."
+      ],
+      "tags": [
+        "offline",
+        "human_review"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.decision_ledger_generation",
+      "name": "Decision Ledger generation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Builds append-only Decision Ledger JSON/Markdown artifacts and safe pending Decision Intake templates from requirements, matches, registry, and optional intake.",
+      "provides": [
+        "decision.ledger.build",
+        "decision.ledger.report",
+        "decision.intake.template.generate"
+      ],
+      "inputs": [
+        "contest_requirements",
+        "requirement_capability_match",
+        "capability_registry",
+        "decision_intake"
+      ],
+      "outputs": [
+        "decision_ledger.json",
+        "decision_ledger.md",
+        "decision_intake_template.json"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/decision_ledger_builder.py",
+          "symbols": [
+            "build_decision_ledger",
+            "build_decision_intake_template",
+            "render_decision_ledger_markdown",
+            "save_decision_outputs"
+          ]
+        },
+        {
+          "path": "factory/run_decision_ledger.py",
+          "symbols": [
+            "main"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_decision_ledger_builder.py",
+          "symbols": [
+            "test_no_intake_required_is_pending_and_not_required_is_not_required",
+            "test_human_confirmed_is_authoritative_and_ai_proposal_or_rejected_are_not",
+            "test_subject_digest_mismatch_is_stale_and_source_digest_mismatch_warns",
+            "test_template_includes_only_required_unresolved_and_sets_revision_and_supersedes"
+          ]
+        },
+        {
+          "path": "tests/test_run_decision_ledger.py",
+          "symbols": [
+            "test_no_intake_required_pending_exit_2_outputs_and_input_unchanged",
+            "test_all_required_human_confirmed_exit_0_and_deterministic",
+            "test_malformed_intake_and_inputs_exit_1_without_outputs"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.decision_intake_validation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Confirmed decisions are recorded but are not automatically applied to ContestSpec or contest_overrides.",
+        "Ledger completeness does not constitute Human Approval or submission readiness."
+      ],
+      "tags": [
+        "offline",
+        "human_review"
+      ]
+    },
+    {
       "capability_id": "cap.generated_harness.constant_baseline_prediction",
       "name": "Generated harness constant baseline prediction",
       "scope": "generated_harness",
