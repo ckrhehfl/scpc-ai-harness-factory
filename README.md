@@ -395,6 +395,78 @@ Exit code:
 - `1`: structural 또는 IO 오류, 최종 산출물 미생성
 - `2`: 산출물 생성, Overall Gate가 `approved`가 아님
 
+v0.12 Submission Handoff Package 단계는 `approved` 상태의 `local_submission_candidate`를 사람이 전달하고 확인할 수
+있도록 deterministic package로 묶는다. 이 단계는 v0.11B Human Approval 뒤의 독립 단계이며 `run_factory.py`에 자동
+통합되지 않는다. Dacon/SCPC 로그인, 브라우저 자동화, submit API 호출, 파일 업로드, solver 실행, 재학습을 수행하지 않는다.
+
+`approved`와 `frozen`은 다르다. `approved`는 Human Approval Summary가 현재 readiness digest를 승인했다는 뜻이고,
+`frozen`은 package candidate digest가 별도 Human Freeze Confirmation과 일치한다는 뜻이다. Freeze Confirmation은
+machine readiness blocker나 Human Approval blocker를 덮어쓸 수 없다.
+
+Candidate Digest는 다음 값을 canonical JSON으로 묶은 SHA-256이다.
+
+- package에 들어가는 substantive entry의 실제 byte digest와 size
+- approval readiness digest
+- current approval ID
+- validation report source digest
+
+Freeze Confirmation intake는 `freeze.local_submission_candidate.rNNN` entry를 append-only로 기록한다. `confirmed`는
+non-empty rationale과 현재 candidate digest 일치를 요구하며, stale digest, rejected leaf, 복수 leaf conflict를 각각
+`stale`, `rejected`, `conflicting` handoff status로 분리한다.
+
+독립 CLI:
+
+```bash
+python factory/run_submission_handoff.py \
+  --submission generated/final_harness/outputs/submission.csv \
+  --validation-report generated/final_harness/outputs/validation_report.json \
+  --approval-summary generated/human_approval_summary.json \
+  --decision-ledger generated/decision_ledger.json \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --capabilities generated/capability_registry.json \
+  --output generated
+```
+
+선택 Freeze Confirmation:
+
+```bash
+python factory/run_submission_handoff.py \
+  --submission generated/final_harness/outputs/submission.csv \
+  --validation-report generated/final_harness/outputs/validation_report.json \
+  --approval-summary generated/human_approval_summary.json \
+  --decision-ledger generated/decision_ledger.json \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --capabilities generated/capability_registry.json \
+  --freeze-confirmation /private/path/freeze_confirmation.json \
+  --output generated
+```
+
+생성 산출물:
+
+```text
+generated/submission_handoff_manifest.json
+generated/submission_handoff.md
+generated/freeze_confirmation_template.json
+generated/submission_handoff_package/
+generated/submission_handoff_package.zip
+```
+
+Package allowlist는 `submission/submission.csv`, sanitized validation evidence, governance JSON, requirements/match,
+capability registry, `HANDOFF.md`, `freeze_manifest.json`, 선택 `governance/freeze_confirmation.json`만 허용한다.
+raw validation report는 로컬 절대 경로, test/sample path, message/details를 포함할 수 있어 package에 넣지 않고
+`sanitized_validation_evidence`로 축약한다. CLI 절대 입력 경로는 manifest/package에 기록하지 않는다.
+
+ZIP은 Python 표준 라이브러리 `zipfile`의 `ZIP_STORED`만 사용하며 entry name 정렬, timestamp
+`1980-01-01 00:00:00`, Unix regular file mode `0o100644`, 빈 comment/extra field로 결정적으로 생성한다.
+
+Exit code:
+
+- `0`: handoff status가 `frozen`
+- `1`: structural 또는 IO 오류, 최종 산출물 미생성
+- `2`: artifact 생성, handoff status가 `frozen`이 아님
+
 정상 실행되면 다음 파일들이 생성됩니다.
 
 ```text

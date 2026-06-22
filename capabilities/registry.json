@@ -982,6 +982,145 @@
       ]
     },
     {
+      "capability_id": "cap.factory.freeze_confirmation_validation",
+      "name": "Freeze Confirmation validation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Validates human freeze confirmation intake entries, supersession history, digest drift, and candidate confirmation state for local submission handoff packages.",
+      "provides": [
+        "handoff.freeze_confirmation.validate",
+        "handoff.freeze_confirmation.supersession.validate",
+        "handoff.freeze_confirmation.drift.detect"
+      ],
+      "inputs": [
+        "freeze_confirmation_intake",
+        "candidate_digest"
+      ],
+      "outputs": [
+        "validated_freeze_confirmation_intake",
+        "freeze_confirmation_calculated_state"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/handoff_model.py",
+          "symbols": [
+            "validate_freeze_confirmation_entry",
+            "validate_freeze_confirmation_intake",
+            "validate_handoff_manifest",
+            "sha256_bytes"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_handoff_model.py",
+          "symbols": [
+            "test_valid_confirmation_status_shapes",
+            "test_confirmation_rejects_non_human_and_r000_and_missing_rationale",
+            "test_supersession_validation_duplicate_unknown_self_revision_and_cycle",
+            "test_manifest_summary_counts_sorting_duplicate_and_candidate_digest_validation"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.local_readiness_gate_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Human identity is declared but not cryptographically authenticated.",
+        "Confirmation proves agreement with a candidate digest only and does not perform online submission."
+      ],
+      "tags": [
+        "offline",
+        "human_review",
+        "deterministic"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.submission_handoff_package_generation",
+      "name": "Submission Handoff Package generation",
+      "scope": "factory",
+      "category": "governance",
+      "declared_status": "implemented",
+      "description": "Builds deterministic local submission handoff manifests, strict allowlist packages, candidate digests, freeze templates, and stored ZIP archives.",
+      "provides": [
+        "submission.handoff.preflight",
+        "submission.handoff.manifest.build",
+        "submission.handoff.package.build",
+        "submission.handoff.archive.deterministic"
+      ],
+      "inputs": [
+        "submission.csv",
+        "validation_report",
+        "human_approval_summary",
+        "decision_ledger",
+        "contest_requirements",
+        "requirement_capability_match",
+        "capability_registry",
+        "freeze_confirmation_intake"
+      ],
+      "outputs": [
+        "submission_handoff_manifest.json",
+        "submission_handoff.md",
+        "freeze_confirmation_template.json",
+        "submission_handoff_package",
+        "submission_handoff_package.zip"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/submission_handoff_builder.py",
+          "symbols": [
+            "build_submission_handoff",
+            "build_freeze_confirmation_template",
+            "render_submission_handoff_markdown",
+            "save_submission_handoff_outputs"
+          ]
+        },
+        {
+          "path": "factory/run_submission_handoff.py",
+          "symbols": [
+            "main"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_submission_handoff_builder.py",
+          "symbols": [
+            "test_preflight_pass_without_confirmation_prepared_and_template_r001",
+            "test_confirmed_rejected_stale_conflicting_and_candidate_stability",
+            "test_packaged_json_change_changes_candidate_digest_and_raw_validation_is_sanitized",
+            "test_save_outputs_removes_stale_package_on_blocked_and_zip_is_deterministic"
+          ]
+        },
+        {
+          "path": "tests/test_run_submission_handoff.py",
+          "symbols": [
+            "test_cli_prepared_frozen_rejected_stale_conflicting_and_deterministic",
+            "test_cli_blocked_exit_2_no_package_and_cleans_stale_package",
+            "test_cli_malformed_inputs_exit_1_without_output",
+            "test_cli_missing_submission_is_preflight_blocker_exit_2"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.freeze_confirmation_validation",
+        "cap.factory.local_readiness_gate_generation",
+        "cap.generated_harness.validation_report_emission"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "The package is a local handoff artifact and is not uploaded automatically.",
+        "Frozen status does not guarantee contest acceptance, solver quality, or legal compliance."
+      ],
+      "tags": [
+        "offline",
+        "human_review",
+        "deterministic"
+      ]
+    },
+    {
       "capability_id": "cap.generated_harness.csv_loading",
       "name": "Generated harness CSV loading",
       "scope": "generated_harness",

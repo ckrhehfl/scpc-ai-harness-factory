@@ -534,6 +534,126 @@ v0.11B는 두 factory capability를 추가한다.
 선언하지만 official contest acceptance, Human identity authentication, solver quality, legal/IP review, online submission
 success를 증명하지 않는다.
 
+### 11X. `factory/handoff_model.py`
+
+v0.12 Submission Handoff와 Human Freeze Confirmation의 공통 계약을 검증한다. Handoff scope는
+`local_submission_candidate` 하나로 제한하고, freeze confirmation ID는 `freeze.local_submission_candidate.rNNN`만
+허용한다. `actor`는 `human`만 허용하며 `pending`, `confirmed`, `rejected` 상태를 구분한다.
+
+Confirmed/rejected confirmation은 non-empty rationale이 필요하다. Supersession은 append-only history이며 동일 scope의
+기존 confirmation만 supersede할 수 있다. unknown ID, 자기 자신, 낮거나 같은 revision, cycle은 structural error다.
+복수 unsuperseded leaf는 자동 선택하지 않고 conflict 상태로 남긴다.
+
+이 모듈은 파일 byte SHA-256 (`sha256:<64 lowercase hex>`)과 package path 안전성도 검증한다. Package path는 POSIX
+relative path만 허용하며 absolute path, Windows drive path, `..`, `.`, empty segment, backslash, NUL을 거부한다.
+
+### 11Y. `factory/submission_handoff_builder.py`
+
+v0.11B Human Approval Summary 뒤의 독립 handoff builder다. 입력은 `submission.csv`, `validation_report.json`,
+`human_approval_summary.json`, `decision_ledger.json`, `contest_requirements.json`, `requirement_capability_match.json`,
+`capability_registry.json`, 선택 `freeze_confirmation_intake.json`이다.
+
+이 builder는 다음 상태 계층을 섞지 않는다.
+
+- Human Approval Summary status
+- Handoff Preflight status
+- Package Candidate status
+- Freeze Confirmation status
+- Final Handoff status
+
+Preflight는 Human Approval Summary가 approved인지, machine readiness가 reviewable인지, human approval이 authoritative
+및 granted인지, source digest가 현재 input artifact의 canonical digest와 일치하는지, readiness digest가 재계산 결과와
+일치하는지 확인한다. Submission 파일은 symlink가 아닌 regular `.csv`, size > 0, UTF-8/UTF-8-SIG header read 가능,
+최소 1개 column을 요구한다. Validation report는 `passed == true`, `error_count == 0`, report의 submission path가 현재
+CLI submission과 resolve 기준으로 일치해야 한다.
+
+Validation report에는 submission byte digest가 없으므로 snapshot consistency는 보수적으로만 검사한다. Report가
+`required_columns_present.details.submission_columns` 또는 `row_count_matches_test.details.submission_row_count`를 제공하면
+현재 CSV header/row count와 정확히 일치해야 한다. Detail이 없으면 warning이며, exact byte binding은 candidate digest와
+freeze confirmation이 담당한다.
+
+Package는 directory scan으로 자동 수집하지 않고 고정 allowlist만 작성한다.
+
+```text
+submission/submission.csv
+evidence/validation_evidence.json
+governance/human_approval_summary.json
+governance/decision_ledger.json
+requirements/contest_requirements.json
+requirements/requirement_capability_match.json
+capabilities/capability_registry.json
+HANDOFF.md
+freeze_manifest.json
+governance/freeze_confirmation.json  # optional
+```
+
+Raw validation report는 package에 넣지 않는다. `submission_path`, `test_csv_path`, `sample_submission_csv_path`,
+message/details 계열 값에 로컬 절대 경로나 민감한 구조가 들어갈 수 있기 때문이다. Package에는
+`sanitized_validation_evidence`만 들어가며 check name, passed, severity만 보존한다.
+
+Candidate Digest는 substantive package entry만 포함한다. `HANDOFF.md`, `freeze_manifest.json`,
+`freeze_confirmation.json`은 순환 digest를 피하기 위해 제외한다. Submission CSV는 원본 byte를 그대로 복사하고, JSON package
+artifact는 `json.dumps(..., ensure_ascii=False, sort_keys=True, indent=2) + "\n"` UTF-8 byte로 직렬화한다.
+
+Handoff status 우선순위는 preflight blocker `blocked`, 복수 confirmation leaf `conflicting`, stale digest `stale`,
+rejected leaf `rejected`, current human confirmed `frozen`, 그 외 `prepared`다. `frozen`만 최종 handoff로 인정한다.
+
+### 11Z. `factory/run_submission_handoff.py`
+
+Submission Handoff를 독립 실행하는 CLI다. `factory/run_factory.py`에 통합하지 않는다.
+
+```bash
+python factory/run_submission_handoff.py \
+  --submission generated/final_harness/outputs/submission.csv \
+  --validation-report generated/final_harness/outputs/validation_report.json \
+  --approval-summary generated/human_approval_summary.json \
+  --decision-ledger generated/decision_ledger.json \
+  --requirements generated/contest_requirements.json \
+  --matches generated/requirement_capability_match.json \
+  --capabilities generated/capability_registry.json \
+  --freeze-confirmation /private/path/freeze_confirmation.json \
+  --output generated
+```
+
+생성 산출물:
+
+```text
+generated/submission_handoff_manifest.json
+generated/submission_handoff.md
+generated/freeze_confirmation_template.json
+generated/submission_handoff_package/
+generated/submission_handoff_package.zip
+```
+
+Preflight blocked이면 manifest/Markdown/template만 쓰고 stale `submission_handoff_package/` 및
+`submission_handoff_package.zip`은 제거한다. Package는 임시 directory에서 완성한 뒤 교체한다.
+
+ZIP은 Python 표준 라이브러리 `zipfile`만 사용하고 `ZIP_STORED`, sorted entry names, timestamp
+`1980-01-01 00:00:00`, `create_system=3`, Unix regular file mode `0o100644`, 빈 comment/extra field를 사용한다.
+같은 입력과 같은 handoff 상태에서는 ZIP byte가 동일해야 한다.
+
+Exit code:
+
+```text
+0: handoff status == frozen
+1: structural/IO 오류
+2: artifact 생성, frozen이 아님
+```
+
+이 단계는 Dacon/SCPC 로그인, 파일 업로드, submit API 호출, 브라우저 자동화, solver 실행, 재학습을 수행하지 않는다.
+Frozen은 local handoff byte 동결만 의미하며 official contest acceptance, solver quality, legal/IP review, online
+submission success를 보장하지 않는다.
+
+### 11AA. `capabilities/registry.json` v0.12 records
+
+v0.12는 두 factory capability를 추가한다.
+
+- `cap.factory.freeze_confirmation_validation`
+- `cap.factory.submission_handoff_package_generation`
+
+두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry total은 25이며 checked-in audit에서
+25개 모두 verified/eligible이어야 한다.
+
 ### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.
