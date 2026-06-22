@@ -268,6 +268,77 @@ Exit code:
 이 단계는 `factory/run_factory.py`와 자동 결합되지 않으며 ContestSpec, GapReport, HarnessBlueprint,
 final harness, `contest_overrides.yaml`을 수정하지 않는다.
 
+### 11K. `factory/requirement_model.py`
+
+v0.10B Contest Requirement와 Requirement-Capability Match artifact의 공통 계약을 검증한다.
+Requirement ID, origin/domain/type/priority/provenance/applicability/risk enum, required token 형식,
+source ref, Evidence ID, summary count, deterministic ordering을 검사한다.
+
+Capability requirement는 최소 하나의 exact token을 가져야 하며, constraint/prohibition/unresolved 항목은
+token 없이도 표현할 수 있다. 이 모델은 Human Approval이나 공식 규칙 승인을 표현하지 않는다.
+
+### 11L. `factory/contest_requirement_builder.py`
+
+`contest_spec.json`, `evidence_index.json`, 선택 `contest_package_coverage.json`에서
+`contest_requirements.json`과 `contest_requirements.md`를 만든다.
+
+생성 범위:
+
+- test.csv loading, prediction row emission
+- task-specific solver requirement
+- submission CSV writing, column order, schema/row/id/target verification
+- local validation report factory policy
+- governance constraint/prohibition/unresolved requirements
+- coverage high-risk unknown과 not-modeled topic requirements
+
+이 단계는 structured artifact만 읽는다. `description.md`, `rules.md`, `evaluation.md`, document chunk text,
+UI 이미지 의미를 파싱해 requirement를 자동 확정하지 않는다.
+
+### 11M. `factory/requirement_capability_matcher.py`
+
+Contest Requirement의 `required_tokens`와 audited Capability Registry의 `provides` token을 정확히 비교한다.
+substring, prefix/suffix, fuzzy, case-insensitive, AI 의미 유사도, alias matching은 없다.
+
+Matcher는 provider capability의 transitive dependency와 risk gate도 다시 검사한다. dependency가 limited이면
+match는 partial이 될 수 있고, ineligible/missing/cycle dependency 또는 blocked risk gate는 blocked로 보고한다.
+constraint/prohibition/unresolved requirement는 token matcher가 준수를 증명할 수 없으므로 `not_evaluated`로 남긴다.
+
+### 11N. `factory/run_requirement_match.py`
+
+Requirement Contract와 Capability Match를 독립 실행하는 CLI다.
+
+```bash
+python factory/run_requirement_match.py \
+  --contest-spec generated/contest_spec.json \
+  --evidence-index generated/evidence_index.json \
+  --capabilities generated/capability_registry.json \
+  --coverage generated/contest_package_coverage.json \
+  --output generated
+```
+
+`--coverage`는 선택이다. CLI는 모든 입력의 structural validation을 산출물 저장 전에 끝낸다.
+
+Exit code:
+
+```text
+0: 산출물 생성, active must gap 없음
+1: structural/IO 오류, 최종 산출물 미생성
+2: 산출물 생성, active must gap 존재
+```
+
+이 단계도 `factory/run_factory.py`에 자동 결합되지 않으며 ContestSpec, GapReport, HarnessBlueprint,
+final harness, `contest_overrides.yaml`, private contest package를 수정하지 않는다.
+
+### 11O. `capabilities/registry.json` v0.10B records
+
+v0.10B는 두 factory capability를 추가한다.
+
+- `cap.factory.contest_requirement_generation`
+- `cap.factory.requirement_capability_matching`
+
+두 capability 모두 구현/test evidence symbol을 static audit 대상으로 등록한다. Registry는 여전히 capability 선언이며
+Contest Requirement 자체나 official rule approval이 아니다.
+
 ### 12. `factory/experiment_manager.py`
 
 factory 실행 이력을 `runs/run_001` 형태로 저장한다.

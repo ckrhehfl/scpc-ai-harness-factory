@@ -281,6 +281,144 @@
       ]
     },
     {
+      "capability_id": "cap.factory.contest_requirement_generation",
+      "name": "Contest requirement contract generation",
+      "scope": "factory",
+      "category": "analysis",
+      "declared_status": "implemented",
+      "description": "Builds deterministic Contest Requirement records from structured ContestSpec, Evidence Index, optional coverage, and fixed factory policy.",
+      "provides": [
+        "contest.requirements.build",
+        "contest.requirements.validate"
+      ],
+      "inputs": [
+        "contest_spec.json",
+        "evidence_index.json",
+        "contest_package_coverage.json"
+      ],
+      "outputs": [
+        "contest_requirements.json",
+        "contest_requirements.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/requirement_model.py",
+          "symbols": [
+            "validate_requirement_record",
+            "build_requirements_artifact",
+            "validate_requirements_artifact"
+          ]
+        },
+        {
+          "path": "factory/contest_requirement_builder.py",
+          "symbols": [
+            "build_contest_requirements",
+            "render_contest_requirements_markdown"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_requirement_model.py",
+          "symbols": [
+            "test_valid_requirement_is_allowed",
+            "test_duplicate_requirement_id_rejected_and_summary_checked",
+            "test_artifact_is_sorted_and_deterministic"
+          ]
+        },
+        {
+          "path": "tests/test_contest_requirement_builder.py",
+          "symbols": [
+            "test_core_requirements_and_evidence_ids_are_generated",
+            "test_solver_tokens_are_task_specific_and_baseline_is_excluded",
+            "test_coverage_high_risk_not_modeled_conflicts_and_determinism"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_spec_generation",
+        "cap.factory.evidence_index_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Requirements are generated only from structured artifacts and fixed deterministic rules.",
+        "Natural-language contest documents are not semantically interpreted."
+      ],
+      "tags": [
+        "offline",
+        "deterministic",
+        "audit"
+      ]
+    },
+    {
+      "capability_id": "cap.factory.requirement_capability_matching",
+      "name": "Requirement-Capability exact-token matching",
+      "scope": "factory",
+      "category": "analysis",
+      "declared_status": "implemented",
+      "description": "Compares Contest Requirement required tokens to audited Capability Registry provides tokens using exact matching, dependency checks, and risk gates.",
+      "provides": [
+        "requirement.capability.match",
+        "requirement.match.report"
+      ],
+      "inputs": [
+        "contest_requirements.json",
+        "capability_registry.json",
+        "contest_spec.json"
+      ],
+      "outputs": [
+        "requirement_capability_match.json",
+        "requirement_capability_match.md"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "factory/requirement_capability_matcher.py",
+          "symbols": [
+            "match_requirements_to_capabilities",
+            "render_requirement_capability_match_markdown",
+            "validate_capability_registry"
+          ]
+        },
+        {
+          "path": "factory/run_requirement_match.py",
+          "symbols": [
+            "main"
+          ]
+        }
+      ],
+      "test_evidence": [
+        {
+          "path": "tests/test_requirement_capability_matcher.py",
+          "symbols": [
+            "test_exact_token_satisfied_without_substring_or_case_matching",
+            "test_dependencies_are_transitive_and_can_limit_or_block",
+            "test_risk_gates_block_until_allowed"
+          ]
+        },
+        {
+          "path": "tests/test_run_requirement_match.py",
+          "symbols": [
+            "test_cli_success_exit_0_when_all_active_must_requirements_match",
+            "test_cli_mock_solver_gap_exit_2_and_is_deterministic",
+            "test_cli_malformed_inputs_exit_1_without_output"
+          ]
+        }
+      ],
+      "dependencies": [
+        "cap.factory.contest_requirement_generation"
+      ],
+      "risk_gates": [],
+      "limitations": [
+        "Matching is exact-token based and does not prove semantic adequacy.",
+        "Constraint and prohibition compliance are reported but not proven by token matching."
+      ],
+      "tags": [
+        "offline",
+        "deterministic",
+        "audit"
+      ]
+    },
+    {
       "capability_id": "cap.factory.evidence_index_generation",
       "name": "Evidence index generation",
       "scope": "factory",
